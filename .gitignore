@@ -1,0 +1,38 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables (Crucial for API key security)
+.env
+.env.*
+!.env.example
+
+# Audio Cache (Generated at runtime by Edge-TTS)
+public/audio_cache/*
+!public/audio_cache/.gitkeep
+
+# Temporary test files
+test_*.png
+test_*.jpg
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
