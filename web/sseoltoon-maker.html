@@ -424,6 +424,16 @@ async function discoverModels() {
   return S.models;
 }
 const key = () => $('#keyInput').value.trim();
+/** 앞뒤 무음 잘라내기 (앞 0.05초, 뒤 0.15초 여유) */
+function trimSilence(buf) {
+  const d = buf.getChannelData(0), th = 0.02, r = buf.sampleRate;
+  let a = 0, b = d.length - 1;
+  while (a < b && Math.abs(d[a]) < th) a++;
+  while (b > a && Math.abs(d[b]) < th) b--;
+  a = Math.max(0, a - Math.floor(r * 0.05)); b = Math.min(d.length, b + Math.floor(r * 0.15));
+  if (b - a < r * 0.2) return buf;
+  const out = ac().createBuffer(1, b - a, r); out.getChannelData(0).set(d.subarray(a, b)); return out;
+}
 function pcmToBuffer(b64, rate) {
   const bin = atob(b64), n = bin.length >> 1, buf = ac().createBuffer(1, n, rate), ch = buf.getChannelData(0);
   for (let i = 0; i < n; i++) { let v = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8); if (v >= 32768) v -= 65536; ch[i] = v / 32768; }
@@ -443,8 +453,14 @@ async function geminiVoice(text, voice, styleHint) {
       const part = (j.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
       const inl = part && (part.inlineData || part.inline_data);
       if (!inl) throw new Error('음성이 오지 않았습니다. 대사를 조금 바꿔 다시 시도해 주세요.');
-      const rate = Number((inl.mimeType || inl.mime_type || '').match(/rate=(\d+)/)?.[1] || 24000);
-      return pcmToBuffer(inl.data, rate);
+      const mime = inl.mimeType || inl.mime_type || '';
+      let buf;
+      if (/wav/i.test(mime) || atob(inl.data.slice(0, 8)).startsWith('RIFF')) {
+        const bin = atob(inl.data), u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        buf = await ac().decodeAudioData(u8.buffer);
+      } else buf = pcmToBuffer(inl.data, Number(mime.match(/rate=(\d+)/)?.[1] || 24000));
+      return trimSilence(buf);
     }
     const t = await r.text();
     if (r.status === 429 && /limit: 0/.test(t)) throw new Error('무료 등급에서 이 음성 모델을 쓸 수 없습니다. Google AI Studio에서 결제를 켜 주세요.');
@@ -725,6 +741,7 @@ function setMode(m) {
 $('#modeDemo').onclick = () => setMode('demo');
 $('#modeGemini').onclick = () => setMode('gemini');
 try { const k = localStorage.getItem('sseoltoon-gemini-key'); if (k) $('#keyInput').value = k; } catch { /* 저장소 사용 불가 */ }
+$('#keyInput').onchange = () => { try { localStorage.setItem('sseoltoon-gemini-key', key()); } catch { /* 무시 */ } };
 go(1);
 </script>
 </body>
