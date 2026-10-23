@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>썰툰 제작기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#F5F4F0; --panel:#FFFFFF; --ink:#1C1C1E; --ink2:#55555C; --line:#E2E0DA;
+  --accent:#2F5BEA; --accent-soft:#E8EEFF; --good:#1F7A45; --good-soft:#E3F3E9; --bad:#B42318; --bad-soft:#FBE4E1; --warn-soft:#FBF0D9; --warn:#9A6200; --radius:10px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:14px 24px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:18px;font-weight:800}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.field{display:flex;align-items:center;gap:8px}
+.field label{font-size:13px;color:var(--ink2);white-space:nowrap}
+.field input{border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-height:36px;background:#fff}
+#keyInput{width:240px}
+.small{font-size:13px;color:var(--ink2)}
+.layout{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1400px;margin:0 auto}
+nav{flex:1 1 200px;max-width:240px;display:flex;flex-direction:column;gap:6px}
+nav button{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid transparent;background:transparent;border-radius:var(--radius);padding:10px 12px;cursor:pointer;min-height:44px}
+nav button:hover:not(:disabled){background:#ECEAE4}
+nav button[aria-current="step"]{background:var(--panel);border-color:var(--line);font-weight:700}
+nav button:disabled{color:#A3A29D;cursor:not-allowed}
+.dot{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;font-size:12px;font-weight:700}
+.dot.done{background:var(--good);border-color:var(--good);color:#fff}
+main{flex:999 1 680px;min-width:0}
+section{display:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px}
+section.active{display:block}
+section h2{margin:0 0 4px;font-size:22px;font-weight:800}
+.lead{margin:0 0 18px;color:var(--ink2)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 16px;cursor:pointer;min-height:42px;font-weight:600}
+.btn:hover:not(:disabled){border-color:#BEBCB5}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover:not(:disabled){background:#2449C4}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:12px 14px;resize:vertical;background:#fff;font-family:Pretendard,"Malgun Gothic",sans-serif}
+#script{min-height:320px;line-height:1.7}
+.hint{background:#F0EFEA;border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--ink2);margin-top:12px}
+.hint code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+.chars{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:16px}
+.char{border:1px solid var(--line);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px}
+.char canvas{width:100%;aspect-ratio:1/1;background:#EFE9DD;border-radius:8px}
+.char h3{margin:0;font-size:16px}
+.char select,.char input[type=file]{width:100%}
+select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;min-height:36px}
+.tablebox{overflow-x:auto;margin-top:14px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:13px;color:var(--ink2);font-weight:600;white-space:nowrap}
+td.line{min-width:240px}
+td select{min-height:32px;padding:4px 6px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#EFEEEA;color:var(--ink2);white-space:nowrap}
+.status{display:none;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border-radius:var(--radius);background:var(--accent-soft)}
+.status.show{display:flex}
+.spinner{width:18px;height:18px;border:2.5px solid #B9C7F7;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bar{flex:1;height:6px;background:#D3DCFA;border-radius:3px;overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.msg{margin-top:14px;padding:12px 14px;border-radius:var(--radius);font-size:14px;display:none;white-space:pre-line}
+.msg.show{display:block}
+.msg.error{background:var(--bad-soft);color:var(--bad)}
+.msg.info{background:var(--good-soft);color:var(--good)}
+.player{display:flex;flex-direction:column;gap:12px}
+#stage{width:100%;max-width:960px;aspect-ratio:16/9;background:#111;border-radius:var(--radius)}
+.timeline{display:flex;gap:3px;max-width:960px;overflow-x:auto;padding-bottom:4px}
+.timeline button{flex:none;border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;min-height:32px}
+.timeline button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+#dl{font-weight:700;color:var(--accent)}
+@media (max-width:720px){header{padding:12px 16px} .layout{padding:16px} nav{max-width:none;flex-direction:row;overflow-x:auto} nav button{flex:none} section{padding:20px 16px} #keyInput{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>썰툰 제작기</h1>
+  <div class="seg" role="group" aria-label="실행 방식">
+    <button type="button" id="modeDemo" aria-pressed="true">데모 (키 없이)</button>
+    <button type="button" id="modeGemini" aria-pressed="false">Gemini</button>
+  </div>
+  <div class="field" id="keyField" hidden>
+    <label for="keyInput">API 키</label>
+    <input id="keyInput" type="password" autocomplete="off" placeholder="Google AI Studio API 키">
+  </div>
+  <span class="small" id="modelInfo"></span>
+</header>
+
+<div class="layout">
+  <nav aria-label="제작 단계">
+    <button type="button" data-step="1"><span class="dot">1</span>대본</button>
+    <button type="button" data-step="2"><span class="dot">2</span>캐릭터·목소리</button>
+    <button type="button" data-step="3"><span class="dot">3</span>컷 확인</button>
+    <button type="button" data-step="4"><span class="dot">4</span>음성 만들기</button>
+    <button type="button" data-step="5"><span class="dot">5</span>미리보기·저장</button>
+  </nav>
+  <main>
+    <section id="s1">
+      <h2>1. 대본</h2>
+      <p class="lead">아래 형식으로 대본을 넣으면 한 줄이 한 컷이 됩니다. 형식 없이 쓴 글은 Gemini 모드에서 "AI로 정리"를 누르면 자동으로 바꿔 줍니다.</p>
+      <textarea id="script" aria-label="대본">[장면: 거실, 밤]
+(결혼하고 3년 동안, 시어머니는 내 전화를 한 번도 받지 않았다.)
+(그런데 오늘, 처음으로 시어머니가 먼저 우리 집에 찾아왔다.)
+시어머니: 얘, 잘 지냈니? 오랜만이구나.
+나: 어머님… 갑자기 무슨 일이세요?
+시어머니: 무슨 일은. 며느리 얼굴 보러 왔지. 하하.
+나: 3년 동안 연락 한 번 없으시다가요?
+시어머니: 그건… 내가 좀 바빴잖니.
+(그 순간, 남편이 방에서 나왔다.)
+[장면: 거실, 밤]
+남편: 엄마? 여기 웬일이야?
+시어머니: 아들, 사실 할 얘기가 있어서 왔어.
+시어머니: 엄마가 집을 팔았거든. 당분간 여기서 좀 지내야겠다.
+나: 네?! 지금 저희 집에서 사시겠다고요?
+남편: 엄마, 그걸 왜 이제 말해!
+(나는 그날 밤, 한숨도 자지 못했다.)</textarea>
+      <div class="row" style="margin-top:12px">
+        <button type="button" class="btn primary" id="parseBtn">컷 나누기</button>
+        <button type="button" class="btn" id="aiFormatBtn" hidden>AI로 정리 (형식 없는 글)</button>
+        <span class="small" id="parseNote"></span>
+      </div>
+      <div class="hint">
+        <b>형식</b> &nbsp; <code>이름: 대사</code> 등장인물 대사 · <code>(문장)</code> 나레이션 · <code>[장면: 장소]</code> 장소 바뀜<br>
+        대사 끝의 <code>!</code> <code>?!</code> <code>…</code> <code>ㅋㅋ</code> 같은 표현으로 표정이 자동으로 정해지고, 3단계에서 직접 바꿀 수 있습니다.
+      </div>
+    </section>
+
+    <section id="s2">
+      <h2>2. 캐릭터·목소리</h2>
+      <p class="lead">대본에서 찾은 등장인물입니다. 캐릭터 검증기에서 저장한 <b>.zip</b>을 넣으면 그 캐릭터로 바뀌고, 없으면 데모 캐릭터를 씁니다. 나레이션은 '나' 캐릭터 목소리로 읽습니다.</p>
+      <div class="chars" id="chars"></div>
+      <div class="row" style="margin-top:18px"><button type="button" class="btn primary" id="toCuts">다음: 컷 확인</button></div>
+    </section>
+
+    <section id="s3">
+      <h2>3. 컷 확인</h2>
+      <p class="lead">컷마다 표정과 구도를 확인하세요. 구도는 장면 구도 템플릿 기준입니다(2인 대화, 원샷, 클로즈업, 나레이션).</p>
+      <div class="tablebox"><table id="cutTable"><thead><tr><th>#</th><th>장소</th><th>화자</th><th>대사</th><th>표정</th><th>구도</th></tr></thead><tbody></tbody></table></div>
+      <div class="row" style="margin-top:18px"><button type="button" class="btn primary" id="toVoice">다음: 음성 만들기</button><span class="small" id="cutSummary"></span></div>
+    </section>
+
+    <section id="s4">
+      <h2>4. 음성 만들기</h2>
+      <p class="lead">컷마다 목소리를 만들고, 그 소리 크기에 맞춰 입 모양이 움직입니다. 데모 모드는 사람 말소리 대신 웅얼거리는 소리로 대신합니다.</p>
+      <div class="row">
+        <button type="button" class="btn primary run" id="ttsBtn">음성 만들기</button>
+        <span class="small" id="ttsCost"></span>
+      </div>
+      <div class="tablebox"><table id="voiceTable"><thead><tr><th>#</th><th>화자</th><th>대사</th><th>길이</th><th></th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section id="s5">
+      <h2>5. 미리보기·저장</h2>
+      <p class="lead">재생해서 확인한 뒤 영상으로 저장하세요. 저장은 실제 길이만큼 재생하며 녹화하므로 영상 길이만큼 걸립니다.</p>
+      <div class="player">
+        <canvas id="stage" width="1280" height="720" aria-label="썰툰 미리보기"></canvas>
+        <div class="row">
+          <button type="button" class="btn primary" id="playBtn">재생</button>
+          <button type="button" class="btn" id="stopBtn">처음으로</button>
+          <button type="button" class="btn run" id="recBtn">영상 저장 (WebM)</button>
+          <span class="small" id="timeInfo">0:00 / 0:00</span>
+          <a id="dl" hidden>다운로드</a>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </section>
+
+    <div class="status" id="status" role="status" aria-live="polite">
+      <div class="spinner"></div><span id="statusText"></span><div class="bar"><i id="statusBar"></i></div>
+      <button type="button" class="btn" id="cancelBtn">중단</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </main>
+</div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const VW = 1280, VH = 720, FPS = 30;
+const EXPRS = ['neutral', 'happy', 'angry', 'sad', 'surprised'];
+const EXPR_KO = { neutral: '기본', happy: '웃음', angry: '화남', sad: '슬픔', surprised: '놀람' };
+const LAYOUT_KO = { two: '2인 대화', one: '원샷', close: '클로즈업', narr: '나레이션' };
+const VOICES = [
+  ['Kore', '여성 · 단단함'], ['Aoede', '여성 · 경쾌함'], ['Leda', '여성 · 젊음'], ['Zephyr', '여성 · 밝음'],
+  ['Charon', '남성 · 차분함'], ['Puck', '남성 · 밝음'], ['Fenrir', '남성 · 강함'], ['Orus', '남성 · 단단함'],
+];
+const PALETTE = [
+  { hair: '#2E2621', shirt: '#5B6B8C' }, { hair: '#8A8A8A', shirt: '#8B6A8F' }, { hair: '#1F1A17', shirt: '#7A8F6F' },
+  { hair: '#5A3A2E', shirt: '#B08A5E' }, { hair: '#3A2A22', shirt: '#A04848' }, { hair: '#6B4B2E', shirt: '#4A7A86' },
+];
+const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
+
+const S = {
+  mode: 'demo', step: 1, busy: false, abort: false,
+  cuts: [], chars: {}, order: [], audio: null, timeline: [], total: 0, models: null,
+};
+
+/* ---------- 공통 ---------- */
+function newCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function g2d(c) { return c.getContext('2d', { willReadFrequently: true }); }
+function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('이미지를 읽지 못했습니다.')); i.src = src; }); }
+function showMsg(t, kind = 'error') { const m = $('#msg'); m.textContent = t; m.className = `msg show ${kind}`; }
+function clearMsg() { $('#msg').className = 'msg'; }
+function setStatus(t, d, n) { $('#status').classList.add('show'); $('#statusText').textContent = `${t}  (${d}/${n})`; $('#statusBar').style.width = `${n ? (d / n) * 100 : 0}%`; }
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+class Cancelled extends Error {}
+$('#cancelBtn').onclick = () => { S.abort = true; $('#statusText').textContent = '현재 작업이 끝나면 멈춥니다…'; };
+async function run(fn) {
+  if (S.busy) return;
+  S.busy = true; S.abort = false; clearMsg(); renderBusy();
+  try { await fn(); } catch (e) {
+    if (e instanceof Cancelled) showMsg('중단했습니다.', 'info'); else { console.error(e); showMsg(e.message || String(e)); }
+  } finally { S.busy = false; $('#status').classList.remove('show'); renderBusy(); renderNav(); }
+}
+function renderBusy() { $$('.run').forEach((b) => { b.disabled = S.busy; }); $('#parseBtn').disabled = S.busy; }
+
+/* ---------- 1. 대본 파싱 ---------- */
+function detectEmotion(line) {
+  const t = line.trim();
+  if (/[?？][!！]|[!！][?？]|헉|설마|뭐라고|네\?!/.test(t)) return 'surprised';
+  if (/ㅋ|ㅎㅎ|하하|호호|좋아|고마워|고맙|기뻐|다행/.test(t)) return 'happy';
+  if (/ㅠ|ㅜ|흑|미안|죄송|눈물|슬퍼|…$|\.\.\.$/.test(t)) return 'sad';
+  if (/[!！]$|왜 이제|어떻게|당장|그만|짜증|화가/.test(t)) return 'angry';
+  return 'neutral';
+}
+function parseScript(text) {
+  const cuts = []; let place = '장소'; let newScene = true;
+  for (const raw of text.split('\n')) {
+    const line = raw.trim(); if (!line) continue;
+    let m;
+    if ((m = line.match(/^\[(?:장면|장소)\s*[:：]\s*(.+?)\]$/))) { place = m[1].trim(); newScene = true; continue; }
+    if ((m = line.match(/^[(（](.+)[)）]$/))) { cuts.push({ kind: 'narr', speaker: '나레이션', text: m[1].trim(), place, newScene }); newScene = false; continue; }
+    if ((m = line.match(/^([^:：]{1,12})\s*[:：]\s*(.+)$/))) { cuts.push({ kind: 'line', speaker: m[1].trim(), text: m[2].trim(), place, newScene }); newScene = false; continue; }
+    cuts.push({ kind: 'narr', speaker: '나레이션', text: line, place, newScene }); newScene = false;
+  }
+  // 표정·구도 자동 지정
+  let recent = [];
+  for (const c of cuts) {
+    if (c.newScene) recent = [];
+    if (c.kind === 'narr') { c.expr = 'neutral'; c.layout = 'narr'; c.shake = false; continue; }
+    c.expr = detectEmotion(c.text);
+    c.shake = c.expr === 'surprised';
+    recent = [c.speaker, ...recent.filter((s) => s !== c.speaker)].slice(0, 2);
+    c.partner = recent[1] || null;
+    c.layout = c.shake ? 'close' : (c.partner ? 'two' : 'one');
+  }
+  return cuts;
+}
+$('#parseBtn').onclick = () => {
+  const cuts = parseScript($('#script').value);
+  if (!cuts.length) { showMsg('대본이 비어 있습니다.'); return; }
+  S.cuts = cuts; S.audio = null;
+  const speakers = [...new Set(cuts.filter((c) => c.kind === 'line').map((c) => c.speaker))];
+  if (cuts.some((c) => c.kind === 'narr') && !speakers.includes('나')) speakers.unshift('나');
+  const oldChars = S.chars; S.chars = {};
+  speakers.forEach((name, i) => {
+    S.chars[name] = oldChars[name] || makeDemoChar(name, i);
+  });
+  S.order = speakers;
+  $('#parseNote').textContent = `컷 ${cuts.length}개 · 등장인물 ${speakers.length}명`;
+  clearMsg(); renderChars(); go(2);
+};
+
+/* ---------- 2. 캐릭터 ---------- */
+function demoSVG(p, expr, eye, mouth) {
+  const brow = { neutral: 'M-70 0 h50 M20 0 h50', happy: 'M-70 4 q25 -12 50 0 M20 4 q25 -12 50 0', angry: 'M-70 -8 l50 14 M20 6 l50 -14', sad: 'M-70 6 l50 -12 M20 -6 l50 12', surprised: 'M-70 -10 q25 -14 50 0 M20 -10 q25 -14 50 0' }[expr];
+  const ry = expr === 'surprised' ? 22 : 18;
+  const eyes = eye === 0
+    ? `<ellipse cx="-45" cy="0" rx="16" ry="${ry}" fill="#2b2b2b"/><ellipse cx="45" cy="0" rx="16" ry="${ry}" fill="#2b2b2b"/><circle cx="-40" cy="-6" r="5" fill="#fff"/><circle cx="50" cy="-6" r="5" fill="#fff"/>`
+    : '<path d="M-62 2 q17 10 34 0 M28 2 q17 10 34 0" stroke="#2b2b2b" stroke-width="5" fill="none" stroke-linecap="round"/>';
+  const smile = expr === 'happy' ? 10 : expr === 'sad' ? -8 : expr === 'angry' ? -4 : 0;
+  const m = mouth === 0
+    ? `<path d="M-28 0 q28 ${smile} 56 0" stroke="#7a3b3b" stroke-width="5" fill="none" stroke-linecap="round"/>`
+    : `<ellipse cx="0" cy="${mouth === 1 ? 2 : 6}" rx="${mouth === 1 ? 20 : 26}" ry="${mouth === 1 ? 9 : 20}" fill="#7a3b3b"/>`;
+  const cheek = expr === 'happy' ? '<ellipse cx="-110" cy="60" rx="26" ry="14" fill="#f2a7a0" opacity=".6"/><ellipse cx="110" cy="60" rx="26" ry="14" fill="#f2a7a0" opacity=".6"/>' : '';
+  const sweat = expr === 'surprised' ? '<path d="M175 -40 q10 22 0 32 q-10 -10 0 -32 z" fill="#8cc4f0" stroke="#3b6e9e" stroke-width="3"/>' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1536">
+<path d="M192 1536 q0 -600 320 -600 q320 0 320 600 z" fill="${p.shirt}" stroke="#333" stroke-width="5"/>
+<rect x="457" y="790" width="110" height="176" fill="#f6d7c3" stroke="#333" stroke-width="5"/>
+<ellipse cx="512" cy="560" rx="230" ry="270" fill="#f6d7c3" stroke="#333" stroke-width="5"/>
+<path d="M272 560 q-10 -330 240 -330 q250 0 240 330 q-40 -170 -240 -200 q-200 30 -240 200 z" fill="${p.hair}" stroke="#333" stroke-width="5"/>
+<g transform="translate(512 460)"><path d="${brow}" stroke="${p.hair}" stroke-width="8" fill="none" stroke-linecap="round"/></g>
+<g transform="translate(512 520)">${eyes}${sweat}</g>
+<path d="M512 560 l-8 50 h16" stroke="#c99" stroke-width="4" fill="none"/>
+<g transform="translate(512 600)">${cheek}</g>
+<g transform="translate(512 680)">${m}</g></svg>`;
+}
+function makeDemoChar(name, i) {
+  const elder = /어머니|할머니|아버지|할아버지|시아버지|사장/.test(name);
+  const p = name === '나' ? PALETTE[0] : elder ? { hair: '#8A8A8A', shirt: PALETTE[(i % 5) + 1].shirt } : { hair: PALETTE[(i % 5) + 1].hair === '#8A8A8A' ? '#1F1A17' : PALETTE[(i % 5) + 1].hair, shirt: PALETTE[(i % 5) + 1].shirt };
+  const female = /나|엄마|어머|시어머니|언니|누나|딸|아내|여자|친구/.test(name) && !/남편|아들|아빠|오빠|형/.test(name);
+  const voice = name === '나' ? 'Kore' : female ? ['Aoede', 'Leda', 'Zephyr'][i % 3] : ['Charon', 'Puck', 'Fenrir', 'Orus'][i % 4];
+  return { name, source: 'demo', palette: p, voice, frames: {}, label: '데모 캐릭터' };
+}
+/** 캐릭터 한 장면 이미지: 표정 · 눈(0 뜸/1 감음) · 입(0/1/2). 512x768 투명 배경으로 캐시 */
+async function prepareFrames(ch) {
+  for (const ex of EXPRS) for (const eye of [0, 1]) for (const mouth of [0, 1, 2]) {
+    const k = `${ex}${eye}${mouth}`; if (ch.frames[k]) continue;
+    if (ch.source === 'demo') {
+      const img = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(demoSVG(ch.palette, ex, eye, mouth)));
+      const c = newCanvas(512, 768); c.getContext('2d').drawImage(img, 0, 0, 512, 768); ch.frames[k] = c;
+    } else {
+      const a = ch.assets[ex] || ch.assets.neutral;
+      const full = newCanvas(1024, 1536), g = g2d(full);
+      g.drawImage(a.base, 0, 0);
+      g.drawImage(eye ? a.eye_closed : a.eye_open, ch.boxes.eye.x, ch.boxes.eye.y);
+      g.drawImage(a[`mouth_${mouth}`], ch.boxes.mouth.x, ch.boxes.mouth.y);
+      const c = newCanvas(512, 768), cg = g2d(c); cg.drawImage(full, 0, 0, 512, 768);
+      const D = cg.getImageData(0, 0, 512, 768);
+      for (let i = 0; i < D.data.length; i += 4) {
+        const r = D.data[i], gg = D.data[i + 1], b = D.data[i + 2], gr = gg - Math.max(r, b);
+        if (gr > 90) D.data[i + 3] = 0; else if (gr > 40) { D.data[i + 3] = Math.round(255 * (1 - (gr - 40) / 50)); D.data[i + 1] = Math.max(r, b); }
+      }
+      cg.putImageData(D, 0, 0); ch.frames[k] = c;
+    }
+  }
+}
+async function loadCharZip(file) {
+  if (typeof JSZip === 'undefined') throw new Error('압축 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.');
+  const zip = await JSZip.loadAsync(file);
+  const info = JSON.parse(await zip.file('character.json').async('string'));
+  const img = async (path) => { const f = zip.file(path); if (!f) return null; const url = URL.createObjectURL(await f.async('blob')); const i = await loadImg(url); URL.revokeObjectURL(url); return i; };
+  const assets = {};
+  for (const ex of EXPRS) {
+    const names = ['base', 'eye_open', 'eye_closed', 'mouth_0', 'mouth_1', 'mouth_2'];
+    const got = {}; let ok = true;
+    for (const n of names) { got[n] = await img(`assets/${ex}/${n}.png`); if (!got[n]) ok = false; }
+    if (ok) assets[ex] = got;
+  }
+  if (!assets.neutral) throw new Error('zip 안에 기본 표정 파츠가 없습니다. 검증기에서 5단계(파츠)까지 마친 뒤 저장한 zip인지 확인해 주세요.');
+  return { assets, boxes: { eye: info.eye_box, mouth: info.mouth_box }, count: Object.keys(assets).length };
+}
+async function drawCharCard(ch, canvas) {
+  await prepareFrames(ch);
+  const g = canvas.getContext('2d'); g.clearRect(0, 0, canvas.width, canvas.height);
+  g.drawImage(ch.frames.neutral00, 0, 0, 512, 512, 0, 0, canvas.width, canvas.height);
+}
+function renderChars() {
+  const box = $('#chars'); box.replaceChildren();
+  for (const name of S.order) {
+    const ch = S.chars[name];
+    const d = document.createElement('div'); d.className = 'char';
+    const id = `c${S.order.indexOf(name)}`;
+    d.innerHTML = `<h3>${name}${name === '나' ? ' <span class="tag">나레이션 겸용</span>' : ''}</h3><canvas width="300" height="300" aria-label="${name} 캐릭터"></canvas>
+      <span class="small">${ch.label}</span>
+      <label class="small" for="${id}v">목소리</label><select id="${id}v">${VOICES.map(([v, k]) => `<option value="${v}" ${v === ch.voice ? 'selected' : ''}>${v} (${k})</option>`).join('')}</select>
+      <label class="small" for="${id}f">검증기 캐릭터 불러오기 (.zip)</label><input type="file" id="${id}f" accept=".zip">`;
+    d.querySelector('select').onchange = (e) => { ch.voice = e.target.value; S.audio = null; renderNav(); };
+    d.querySelector('input[type=file]').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        const r = await loadCharZip(f);
+        Object.assign(ch, { source: 'zip', assets: r.assets, boxes: r.boxes, frames: {}, label: `${f.name} · 표정 ${r.count}종` });
+        renderChars();
+      } catch (err) { showMsg(err.message); }
+    };
+    box.append(d);
+    drawCharCard(ch, d.querySelector('canvas'));
+  }
+}
+$('#toCuts').onclick = () => { renderCuts(); go(3); };
+
+/* ---------- 3. 컷 ---------- */
+function renderCuts() {
+  const tb = $('#cutTable tbody'); tb.replaceChildren();
+  S.cuts.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td><td><span class="tag">${c.place}</span></td><td>${c.kind === 'narr' ? '<span class="small">나레이션</span>' : `<b>${c.speaker}</b>`}</td><td class="line"></td><td></td><td></td>`;
+    tr.querySelector('.line').textContent = c.text;
+    if (c.kind === 'line') {
+      const se = document.createElement('select'); se.setAttribute('aria-label', `${i + 1}번 컷 표정`);
+      se.innerHTML = EXPRS.map((e) => `<option value="${e}" ${e === c.expr ? 'selected' : ''}>${EXPR_KO[e]}</option>`).join('');
+      se.onchange = () => { c.expr = se.value; c.shake = c.expr === 'surprised' && c.layout === 'close'; };
+      tr.children[4].append(se);
+      const sl = document.createElement('select'); sl.setAttribute('aria-label', `${i + 1}번 컷 구도`);
+      const opts = ['one', 'close', ...(c.partner ? ['two'] : [])];
+      sl.innerHTML = opts.map((l) => `<option value="${l}" ${l === c.layout ? 'selected' : ''}>${LAYOUT_KO[l]}</option>`).join('');
+      sl.onchange = () => { c.layout = sl.value; c.shake = c.layout === 'close' && c.expr === 'surprised'; };
+      tr.children[5].append(sl);
+    } else { tr.children[4].innerHTML = '<span class="small">—</span>'; tr.children[5].innerHTML = `<span class="tag">${LAYOUT_KO.narr}</span>`; }
+    tb.append(tr);
+  });
+  const lines = S.cuts.filter((c) => c.kind === 'line').length;
+  $('#cutSummary').textContent = `대사 ${lines}컷 · 나레이션 ${S.cuts.length - lines}컷`;
+}
+$('#toVoice').onclick = () => { renderVoice(); go(4); };
+
+/* ---------- 4. 음성 ---------- */
+let AC = null;
+const ac = () => (AC ||= new (window.AudioContext || window.webkitAudioContext)());
+async function demoVoice(text, seed) {
+  const syl = Math.max(4, [...text.replace(/\s/g, '')].length);
+  const dur = syl * 0.12 + 0.3, rate = 24000;
+  const off = new OfflineAudioContext(1, Math.ceil(dur * rate), rate);
+  const base = 150 + (seed % 5) * 30;
+  for (let i = 0; i < syl; i++) {
+    const t = 0.1 + i * 0.12; if (Math.random() < 0.08) continue;
+    const o = off.createOscillator(), g = off.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(base * (0.9 + Math.random() * 0.3), t);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.35, t + 0.03); g.gain.linearRampToValueAtTime(0.08, t + 0.09); g.gain.linearRampToValueAtTime(0, t + 0.11);
+    o.connect(g).connect(off.destination); o.start(t); o.stop(t + 0.12);
+  }
+  return off.startRendering();
+}
+async function discoverModels() {
+  if (S.models) return S.models;
+  const r = await fetch(`${GEMINI}/models?pageSize=200`, { headers: { 'x-goog-api-key': key() } });
+  if (r.status === 400) throw new Error('API 키가 올바르지 않습니다.');
+  if (!r.ok) throw new Error(`모델 목록을 가져오지 못했습니다 (${r.status}).`);
+  const names = ((await r.json()).models || []).map((m) => m.name.replace('models/', ''));
+  const tts = names.filter((n) => /tts/i.test(n)).sort((a, b) => b.localeCompare(a))[0];
+  const text = names.filter((n) => /^gemini-.*flash/i.test(n) && !/image|tts|lite|audio|live|embedding|thinking/i.test(n)).sort((a, b) => b.localeCompare(a))[0];
+  S.models = { tts, text };
+  $('#modelInfo').textContent = `음성 ${tts || '없음'} · 대본 ${text || '없음'}`;
+  return S.models;
+}
+const key = () => $('#keyInput').value.trim();
+function pcmToBuffer(b64, rate) {
+  const bin = atob(b64), n = bin.length >> 1, buf = ac().createBuffer(1, n, rate), ch = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) { let v = bin.charCodeAt(i * 2) | (bin.charCodeAt(i * 2 + 1) << 8); if (v >= 32768) v -= 65536; ch[i] = v / 32768; }
+  return buf;
+}
+async function geminiVoice(text, voice, styleHint) {
+  const { tts } = await discoverModels();
+  if (!tts) throw new Error('이 키로 쓸 수 있는 Gemini 음성(TTS) 모델이 없습니다.');
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: `${styleHint} 한국어로 자연스럽게 읽어줘: ${text}` }] }],
+    generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+  };
+  for (let attempt = 1; ; attempt++) {
+    const r = await fetch(`${GEMINI}/models/${tts}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key() }, body: JSON.stringify(body) });
+    if (r.ok) {
+      const j = await r.json();
+      const part = (j.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData || p.inline_data);
+      const inl = part && (part.inlineData || part.inline_data);
+      if (!inl) throw new Error('음성이 오지 않았습니다. 대사를 조금 바꿔 다시 시도해 주세요.');
+      const rate = Number((inl.mimeType || inl.mime_type || '').match(/rate=(\d+)/)?.[1] || 24000);
+      return pcmToBuffer(inl.data, rate);
+    }
+    const t = await r.text();
+    if (r.status === 429 && /limit: 0/.test(t)) throw new Error('무료 등급에서 이 음성 모델을 쓸 수 없습니다. Google AI Studio에서 결제를 켜 주세요.');
+    if ((r.status === 429 || r.status >= 500) && attempt < 4) { await new Promise((ok) => setTimeout(ok, attempt * 5000)); continue; }
+    throw new Error(`음성 생성 실패 (${r.status}): ${t.slice(0, 200)}`);
+  }
+}
+const STYLE = { neutral: '담담하게', happy: '밝고 즐겁게', angry: '화가 난 목소리로', sad: '슬프고 힘없이', surprised: '깜짝 놀라서' };
+function voiceOf(c) { return c.kind === 'narr' ? S.chars['나']?.voice || 'Kore' : S.chars[c.speaker].voice; }
+function renderVoice() {
+  const tb = $('#voiceTable tbody'); tb.replaceChildren();
+  S.cuts.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i + 1}</td><td>${c.kind === 'narr' ? '<span class="small">나레이션</span>' : `<b>${c.speaker}</b>`}</td><td class="line"></td><td>${c.buffer ? `${c.buffer.duration.toFixed(1)}초` : '<span class="small">대기</span>'}</td><td></td>`;
+    tr.querySelector('.line').textContent = c.text;
+    if (c.buffer) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = '듣기';
+      b.onclick = () => { const s = ac().createBufferSource(); s.buffer = c.buffer; s.connect(ac().destination); s.start(); };
+      tr.lastElementChild.append(b);
+    }
+    tb.append(tr);
+  });
+  $('#ttsCost').textContent = S.mode === 'demo' ? '데모: 비용 없음' : `Gemini 음성 ${S.cuts.length}회`;
+}
+$('#ttsBtn').onclick = () => run(async () => {
+  if (S.mode === 'gemini' && !key()) throw new Error("맨 위 'API 키' 칸에 키를 먼저 입력해 주세요.");
+  await ac().resume();
+  for (let i = 0; i < S.cuts.length; i++) {
+    if (S.abort) throw new Cancelled();
+    const c = S.cuts[i];
+    setStatus(`${i + 1}번 컷 음성: ${c.text.slice(0, 18)}`, i, S.cuts.length);
+    c.buffer = S.mode === 'demo' ? await demoVoice(c.text, VOICES.findIndex((v) => v[0] === voiceOf(c)) + 1) : await geminiVoice(c.text, voiceOf(c), c.kind === 'narr' ? '1인칭 나레이션처럼 차분하게' : STYLE[c.expr]);
+    renderVoice();
+  }
+  buildTimeline();
+  showMsg(`음성 ${S.cuts.length}개 완료 · 전체 ${fmt(S.total)}. 5단계에서 재생해 보세요.`, 'info');
+  renderNav(); go(5);
+});
+
+/* ---------- 타임라인·입 모양 ---------- */
+function buildTimeline() {
+  const pad = 0.35; let t = 0;
+  S.timeline = S.cuts.map((c, i) => { const s = t; const d = c.buffer.duration + pad + (c.newScene && i ? 0.5 : 0); t += d; return { cut: c, start: s, end: t, voiceStart: s + (c.newScene && i ? 0.5 : 0) }; });
+  S.total = t;
+  const rate = S.cuts[0].buffer.sampleRate;
+  const mix = ac().createBuffer(1, Math.ceil(t * rate) + rate, rate), out = mix.getChannelData(0);
+  for (const seg of S.timeline) {
+    const src = seg.cut.buffer.sampleRate === rate ? seg.cut.buffer.getChannelData(0) : resample(seg.cut.buffer, rate);
+    out.set(src.subarray(0, Math.min(src.length, out.length - Math.floor(seg.voiceStart * rate))), Math.floor(seg.voiceStart * rate));
+  }
+  S.audio = mix;
+  // 1/30초마다 소리 크기 → 입 모양 0/1/2
+  const step = Math.floor(rate / FPS), env = [];
+  let max = 1e-6;
+  for (let i = 0; i < out.length; i += step) { let s = 0; for (let j = i; j < i + step && j < out.length; j++) s += out[j] * out[j]; const v = Math.sqrt(s / step); env.push(v); if (v > max) max = v; }
+  S.mouthEnv = env.map((v) => { const n = v / max; return n < 0.12 ? 0 : n < 0.45 ? 1 : 2; });
+  renderTimelineBar();
+}
+function resample(buf, rate) {
+  const src = buf.getChannelData(0), ratio = buf.sampleRate / rate, out = new Float32Array(Math.floor(src.length / ratio));
+  for (let i = 0; i < out.length; i++) out[i] = src[Math.floor(i * ratio)] || 0;
+  return out;
+}
+function renderTimelineBar() {
+  const tl = $('#timeline'); tl.replaceChildren();
+  S.timeline.forEach((seg, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = `${i + 1} ${seg.cut.kind === 'narr' ? '나레이션' : seg.cut.speaker}`;
+    b.onclick = () => { stopPlay(); P.offset = seg.start; drawAt(P.offset); };
+    tl.append(b);
+  });
+}
+
+/* ---------- 5. 그리기 ---------- */
+const stage = $('#stage'), sg = stage.getContext('2d');
+function hashStr(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; }
+function drawBackground(place, blur) {
+  const h = hashStr(place), hue = h % 360;
+  const night = /밤|저녁|새벽/.test(place);
+  sg.save(); if (blur) sg.filter = 'blur(6px)';
+  const grd = sg.createLinearGradient(0, 0, 0, VH);
+  grd.addColorStop(0, `hsl(${hue} 22% ${night ? 32 : 80}%)`); grd.addColorStop(1, `hsl(${hue} 18% ${night ? 22 : 68}%)`);
+  sg.fillStyle = grd; sg.fillRect(-20, -20, VW + 40, VH + 40);
+  sg.fillStyle = night ? '#1E2A44' : '#DCEBF5'; sg.strokeStyle = `hsl(${hue} 15% ${night ? 20 : 55}%)`; sg.lineWidth = 12;
+  const wx = 120 + (h % 5) * 40; sg.fillRect(wx, 90, 300, 220); sg.strokeRect(wx, 90, 300, 220);
+  if (night) { sg.fillStyle = '#F4E9B8'; sg.beginPath(); sg.arc(wx + 230, 150, 22, 0, Math.PI * 2); sg.fill(); }
+  sg.fillStyle = `hsl(${(hue + 30) % 360} 20% ${night ? 18 : 55}%)`; sg.fillRect(-20, 520, VW + 40, 220);
+  sg.fillStyle = `hsl(${(hue + 30) % 360} 25% ${night ? 24 : 45}%)`; sg.fillRect(760, 300, 220, 230);
+  sg.restore();
+}
+function charFrame(ch, expr, eye, mouth) { return ch.frames[`${expr}${eye}${mouth}`] || ch.frames[`neutral${eye}${mouth}`]; }
+function drawChar(ch, expr, eye, mouth, cx, scale, dim, flip, cropTop = 0) {
+  const f = charFrame(ch, expr, eye, mouth); if (!f) return;
+  const w = 512 * scale, h = 768 * scale;
+  sg.save(); if (dim) sg.filter = 'brightness(0.8)';
+  sg.translate(cx, 0); if (flip) sg.scale(-1, 1);
+  sg.drawImage(f, -w / 2, VH - h + cropTop, w, h);
+  sg.restore();
+}
+function blinkAt(t, seed) { const p = (t + seed * 1.37) % 3.4; return p > 3.2 ? 1 : 0; }
+function drawSubtitle(seg) {
+  const c = seg.cut, text = c.text;
+  sg.save(); sg.font = '700 22px Pretendard, "Malgun Gothic", sans-serif'; sg.textBaseline = 'middle';
+  const tagW = c.kind === 'line' ? sg.measureText(c.speaker).width + 28 : 0;
+  sg.font = '700 34px Pretendard, "Malgun Gothic", sans-serif';
+  const lines = wrap(text, 980 - tagW);
+  const lh = 46, bh = lines.length * lh + 24, by = VH - 44 - bh;
+  const tw = Math.max(...lines.map((l) => sg.measureText(l).width)) + tagW + (tagW ? 16 : 0) + 40;
+  const bx = (VW - tw) / 2;
+  sg.fillStyle = 'rgba(0,0,0,0.68)'; roundRect(bx, by, tw, bh, 10); sg.fill();
+  let x = bx + 20;
+  if (tagW) {
+    const ch = S.chars[c.speaker]; sg.fillStyle = ch?.palette?.shirt || '#5B6B8C';
+    roundRect(x, by + 12 + (lh - 34) / 2, tagW, 34, 6); sg.fill();
+    sg.fillStyle = '#fff'; sg.font = '700 22px Pretendard, "Malgun Gothic", sans-serif'; sg.fillText(c.speaker, x + 14, by + 12 + lh / 2);
+    x += tagW + 16;
+  }
+  sg.fillStyle = '#fff'; sg.font = '700 34px Pretendard, "Malgun Gothic", sans-serif';
+  lines.forEach((l, i) => sg.fillText(l, x, by + 12 + lh / 2 + i * lh));
+  sg.restore();
+}
+function wrap(text, maxW) {
+  const words = text.split(' '), out = []; let cur = '';
+  for (const w of words) { const t = cur ? cur + ' ' + w : w; if (sg.measureText(t).width > maxW && cur) { out.push(cur); cur = w; } else cur = t; }
+  if (cur) out.push(cur); return out.slice(0, 3);
+}
+function roundRect(x, y, w, h, r) { sg.beginPath(); sg.moveTo(x + r, y); sg.arcTo(x + w, y, x + w, y + h, r); sg.arcTo(x + w, y + h, x, y + h, r); sg.arcTo(x, y + h, x, y, r); sg.arcTo(x, y, x + w, y, r); sg.closePath(); }
+function segAt(t) { return S.timeline.find((s) => t >= s.start && t < s.end) || S.timeline[S.timeline.length - 1]; }
+function drawAt(t) {
+  if (!S.timeline.length) return;
+  const seg = segAt(t), c = seg.cut, local = t - seg.start, dur = seg.end - seg.start;
+  const fi = Math.floor(t * FPS), mouth = S.mouthEnv[fi] || 0;
+  const speaking = t >= seg.voiceStart;
+  sg.save();
+  // 카메라: 천천히 줌인, 충격 컷은 흔들림
+  const zoom = 1 + 0.04 * (local / dur);
+  let sx = 0, sy = 0;
+  if (c.shake && local < 0.35) { sx = (Math.random() - 0.5) * 18; sy = (Math.random() - 0.5) * 18; }
+  sg.translate(VW / 2 + sx, VH / 2 + sy); sg.scale(zoom, zoom); sg.translate(-VW / 2, -VH / 2);
+  const narrOnly = c.kind === 'narr';
+  drawBackground(c.place, !narrOnly || !S.chars['나']);
+  if (c.kind === 'narr') {
+    const me = S.chars['나'];
+    if (me) drawChar(me, 'neutral', blinkAt(t, 0), speaking ? mouth : 0, VW / 2, 1.05, false, false);
+  } else {
+    const ch = S.chars[c.speaker], seed = S.order.indexOf(c.speaker);
+    if (c.layout === 'two' && c.partner && S.chars[c.partner]) {
+      const firstLeft = S.order.indexOf(c.speaker) < S.order.indexOf(c.partner);
+      const sxL = 360, sxR = 920;
+      drawChar(S.chars[c.partner], 'neutral', blinkAt(t, S.order.indexOf(c.partner)), 0, firstLeft ? sxR : sxL, 1.0, true, firstLeft);
+      drawChar(ch, c.expr, blinkAt(t, seed), speaking ? mouth : 0, firstLeft ? sxL : sxR, 1.0, false, !firstLeft);
+    } else if (c.layout === 'close') {
+      if (c.shake) { drawSpeedLines(); }
+      drawChar(ch, c.expr, blinkAt(t, seed), speaking ? mouth : 0, VW / 2, 1.9, false, false, 780);
+    } else {
+      drawChar(ch, c.expr, blinkAt(t, seed), speaking ? mouth : 0, VW / 2, 1.05, false, false);
+    }
+  }
+  sg.restore();
+  // 장소 캡션 (장면 첫 컷 1.5초)
+  if (c.newScene && local < 1.8) {
+    sg.save(); sg.globalAlpha = Math.min(1, (1.8 - local) * 2);
+    sg.font = '800 30px Pretendard, "Malgun Gothic", sans-serif';
+    const w = sg.measureText(c.place).width + 36;
+    sg.fillStyle = 'rgba(255,255,255,0.92)'; roundRect(48, 44, w, 54, 8); sg.fill();
+    sg.fillStyle = '#1C1C1E'; sg.textBaseline = 'middle'; sg.fillText(c.place, 66, 71); sg.restore();
+  }
+  if (speaking || c.kind === 'narr') drawSubtitle(seg);
+  $('#timeInfo').textContent = `${fmt(t)} / ${fmt(S.total)}`;
+  $$('#timeline button').forEach((b, i) => b.classList.toggle('on', S.timeline[i] === seg));
+}
+function drawSpeedLines() {
+  sg.save(); sg.fillStyle = '#F4F3EF'; sg.fillRect(-20, -20, VW + 40, VH + 40); sg.fillStyle = '#1F1F1F';
+  const cx = VW / 2, cy = 300;
+  for (let i = 0; i < 64; i++) {
+    const a = (i / 64) * Math.PI * 2, r0 = 330 + (i * 37 % 5) * 24, w = i % 3 ? 0.012 : 0.02;
+    sg.beginPath(); sg.moveTo(cx + r0 * Math.cos(a), cy + r0 * Math.sin(a));
+    sg.lineTo(cx + 1400 * Math.cos(a - w), cy + 1400 * Math.sin(a - w)); sg.lineTo(cx + 1400 * Math.cos(a + w), cy + 1400 * Math.sin(a + w)); sg.fill();
+  }
+  sg.restore();
+}
+
+/* ---------- 재생·녹화 ---------- */
+const P = { src: null, t0: 0, offset: 0, raf: 0, playing: false, resolve: null };
+async function ensureFrames() { for (const n of S.order) await prepareFrames(S.chars[n]); }
+async function play(dest) {
+  if (!S.audio) { showMsg('4단계에서 음성을 먼저 만들어 주세요.'); return null; }
+  await ensureFrames(); await ac().resume(); stopPlay();
+  const src = ac().createBufferSource(); src.buffer = S.audio;
+  src.connect(ac().destination); if (dest) src.connect(dest);
+  P.src = src; P.t0 = ac().currentTime - P.offset; P.playing = true; $('#playBtn').textContent = '일시정지';
+  src.start(0, P.offset);
+  const done = new Promise((res) => { P.resolve = res; src.onended = () => stopPlay(); });
+  const loop = () => {
+    if (!P.playing) return;
+    const t = ac().currentTime - P.t0;
+    if (t >= S.total) { drawAt(S.total - 0.01); stopPlay(); P.offset = 0; return; }
+    drawAt(t); P.raf = requestAnimationFrame(loop);
+  };
+  loop();
+  return done;
+}
+function stopPlay() {
+  if (P.src) { P.src.onended = null; try { P.src.stop(); } catch { /* 이미 멈춤 */ } P.src = null; }
+  if (P.playing) P.offset = Math.min(S.total, ac().currentTime - P.t0);
+  P.playing = false; cancelAnimationFrame(P.raf); $('#playBtn').textContent = '재생';
+  if (P.resolve) { const r = P.resolve; P.resolve = null; r(); }
+}
+$('#playBtn').onclick = () => { if (P.playing) stopPlay(); else play(); };
+$('#stopBtn').onclick = () => { stopPlay(); P.offset = 0; drawAt(0); };
+$('#recBtn').onclick = () => run(async () => {
+  if (!S.audio) throw new Error('4단계에서 음성을 먼저 만들어 주세요.');
+  if (typeof MediaRecorder === 'undefined') throw new Error('이 브라우저는 영상 저장을 지원하지 않습니다. 크롬이나 엣지 최신 버전을 써 주세요.');
+  await ensureFrames(); await ac().resume();
+  const dest = ac().createMediaStreamDestination();
+  const stream = new MediaStream([...stage.captureStream(FPS).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+  const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+  const chunks = []; rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise((res) => { rec.onstop = res; });
+  P.offset = 0; rec.start(1000);
+  const timer = setInterval(() => { setStatus('녹화 중', Math.floor(ac().currentTime - P.t0), Math.ceil(S.total)); if (S.abort) { stopPlay(); rec.stop(); } }, 500);
+  await play(dest);
+  clearInterval(timer);
+  if (rec.state !== 'inactive') { await new Promise((r) => setTimeout(r, 300)); rec.stop(); }
+  await stopped;
+  if (S.abort) throw new Cancelled();
+  const blob = new Blob(chunks, { type: 'video/webm' });
+  window.__lastVideo = blob;
+  const a = $('#dl'); a.href = URL.createObjectURL(blob); a.download = `썰툰-${new Date().toISOString().slice(0, 10)}.webm`; a.hidden = false;
+  a.textContent = `다운로드 (${(blob.size / 1048576).toFixed(1)}MB)`;
+  a.click();
+  showMsg('영상을 저장했습니다. 다운로드가 자동으로 시작되지 않으면 "다운로드"를 눌러 주세요.', 'info');
+});
+
+/* ---------- AI 대본 정리 ---------- */
+$('#aiFormatBtn').onclick = () => run(async () => {
+  if (!key()) throw new Error("맨 위 'API 키' 칸에 키를 먼저 입력해 주세요.");
+  const { text } = await discoverModels();
+  if (!text) throw new Error('이 키로 쓸 수 있는 Gemini 글 모델이 없습니다.');
+  setStatus('대본 정리 중', 0, 1);
+  const prompt = `아래 글을 한국 썰툰 영상 대본 형식으로 바꿔줘. 규칙: 장소가 바뀌면 [장면: 장소] 한 줄, 나레이션은 (문장), 대사는 이름: 대사. 1인칭 화자는 '나'로. 한 줄은 40자 이내. 형식 외 설명은 쓰지 마.\n\n${$('#script').value}`;
+  const r = await fetch(`${GEMINI}/models/${text}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key() }, body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }) });
+  if (!r.ok) throw new Error(`대본 정리 실패 (${r.status}): ${(await r.text()).slice(0, 200)}`);
+  const out = ((await r.json()).candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').replace(/```/g, '').trim();
+  if (!out) throw new Error('정리된 대본이 오지 않았습니다.');
+  $('#script').value = out; showMsg('대본을 형식에 맞게 정리했습니다. 확인 후 "컷 나누기"를 누르세요.', 'info');
+});
+
+/* ---------- 단계 이동 ---------- */
+function stepState() {
+  return { 1: true, 2: S.cuts.length > 0, 3: S.cuts.length > 0, 4: S.cuts.length > 0, 5: !!S.audio };
+}
+function renderNav() {
+  const st = stepState();
+  const done = { 1: S.cuts.length > 0, 2: S.cuts.length > 0 && S.step > 2, 3: S.step > 3 && S.cuts.length > 0, 4: !!S.audio, 5: !!window.__lastVideo };
+  $$('nav button').forEach((b) => {
+    const n = Number(b.dataset.step); b.disabled = !st[n]; b.setAttribute('aria-current', n === S.step ? 'step' : 'false');
+    const d = b.querySelector('.dot'); d.classList.toggle('done', !!done[n]); d.textContent = done[n] ? '✓' : n;
+  });
+}
+function go(n) {
+  if (!stepState()[n]) return;
+  if (S.step === 5 && n !== 5) stopPlay();
+  S.step = n;
+  $$('section').forEach((s) => s.classList.toggle('active', s.id === `s${n}`));
+  if (n === 3) renderCuts();
+  if (n === 4) renderVoice();
+  if (n === 5) { ensureFrames().then(() => drawAt(P.offset)); renderTimelineBar(); }
+  renderNav(); window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+$$('nav button').forEach((b) => { b.onclick = () => go(Number(b.dataset.step)); });
+function setMode(m) {
+  S.mode = m; S.models = null; $('#modelInfo').textContent = '';
+  $('#modeDemo').setAttribute('aria-pressed', String(m === 'demo')); $('#modeGemini').setAttribute('aria-pressed', String(m === 'gemini'));
+  $('#keyField').hidden = $('#aiFormatBtn').hidden = m !== 'gemini';
+  S.cuts.forEach((c) => { delete c.buffer; }); S.audio = null; renderNav(); if (S.step >= 4) go(S.cuts.length ? 4 : 1);
+}
+$('#modeDemo').onclick = () => setMode('demo');
+$('#modeGemini').onclick = () => setMode('gemini');
+try { const k = localStorage.getItem('sseoltoon-gemini-key'); if (k) $('#keyInput').value = k; } catch { /* 저장소 사용 불가 */ }
+go(1);
+</script>
+</body>
+</html>
