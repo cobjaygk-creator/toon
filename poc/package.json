@@ -1,0 +1,33 @@
+{
+  "name": "sseoltoon-poc",
+  "version": "1.0.0",
+  "description": "썰툰 제작기 0단계 기술검증",
+  "main": "index.js",
+  "scripts": {
+    "grid": "tsx scripts/00-grid.ts",
+    "sheet": "tsx scripts/01-sheet.ts",
+    "consistency": "tsx scripts/02-consistency.ts",
+    "expressions": "tsx scripts/03-expressions.ts",
+    "parts": "tsx scripts/04-parts.ts",
+    "preview": "tsx scripts/05-preview.ts",
+    "typecheck": "tsc --noEmit",
+    "selftest": "tsx scripts/_selftest.ts",
+    "demo": "npm run sheet -- --provider mock && npm run sheet -- --provider mock --pick 1 && npm run grid -- --provider mock && npm run consistency -- --provider mock --count 6 && npm run expressions -- --provider mock && npm run parts -- --provider mock && npm run preview -- --provider mock"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "dotenv": "^18.0.8",
+    "gifenc": "^1.0.3",
+    "openai": "^7.34.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  },
+  "type": "module"
+}

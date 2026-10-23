@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>썰툰 캐릭터 검증기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#F5F4F0; --panel:#FFFFFF; --ink:#1C1C1E; --ink2:#55555C; --line:#E2E0DA;
+  --accent:#2F5BEA; --accent-soft:#E8EEFF; --good:#1F7A45; --warn:#9A6200; --bad:#B42318;
+  --good-soft:#E3F3E9; --warn-soft:#FBF0D9; --bad-soft:#FBE4E1; --radius:10px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Pretendard,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:15px;line-height:1.5}
+button,input,select,textarea{font:inherit;color:inherit}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:14px 24px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:18px;font-weight:800;letter-spacing:-0.01em}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;min-height:36px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.field{display:flex;align-items:center;gap:8px}
+.field label{font-size:13px;color:var(--ink2);white-space:nowrap}
+.field input[type=password],.field input[type=text]{border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-height:36px;background:#fff}
+#keyInput{width:260px} #modelInput{width:200px}
+.small{font-size:13px;color:var(--ink2)}
+.layout{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1360px;margin:0 auto}
+nav{flex:1 1 220px;max-width:260px;display:flex;flex-direction:column;gap:6px}
+nav button{display:flex;align-items:center;gap:10px;text-align:left;border:1px solid transparent;background:transparent;border-radius:var(--radius);padding:10px 12px;cursor:pointer;min-height:44px}
+nav button:hover:not(:disabled){background:#ECEAE4}
+nav button[aria-current="step"]{background:var(--panel);border-color:var(--line);font-weight:700}
+nav button:disabled{color:#A3A29D;cursor:not-allowed}
+.dot{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;font-size:12px;font-weight:700}
+.dot.done{background:var(--good);border-color:var(--good);color:#fff}
+main{flex:999 1 640px;min-width:0}
+section{display:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px}
+section.active{display:block}
+section h2{margin:0 0 4px;font-size:22px;font-weight:800;letter-spacing:-0.01em}
+section .lead{margin:0 0 20px;color:var(--ink2)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px 16px;cursor:pointer;min-height:42px;font-weight:600}
+.btn:hover:not(:disabled){border-color:#BEBCB5}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover:not(:disabled){background:#2449C4}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.cost{font-size:13px;color:var(--ink2)}
+textarea{width:100%;min-height:76px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;resize:vertical;background:#fff}
+.grid{display:grid;gap:12px;margin-top:18px}
+.g4{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.g5{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+.card{position:relative;border:2px solid var(--line);border-radius:var(--radius);overflow:hidden;background:#FAFAF8;padding:0;cursor:pointer;display:block;width:100%}
+.card img{display:block;width:100%;aspect-ratio:2/3;object-fit:cover}
+.card .cap{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:6px 8px;font-size:13px;background:#fff;border-top:1px solid var(--line)}
+.card[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.card.static{cursor:default}
+.badge{display:inline-block;font-size:12px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.badge.good{background:var(--good-soft);color:var(--good)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.bad{background:var(--bad-soft);color:var(--bad)}
+.badge.none{background:#EFEEEA;color:var(--ink2)}
+.status{display:none;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border-radius:var(--radius);background:var(--accent-soft)}
+.status.show{display:flex}
+.spinner{width:18px;height:18px;border:2.5px solid #B9C7F7;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.bar{flex:1;height:6px;background:#D3DCFA;border-radius:3px;overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.msg{margin-top:14px;padding:12px 14px;border-radius:var(--radius);font-size:14px;display:none;white-space:pre-line}
+.msg.show{display:block}
+.msg.error{background:var(--bad-soft);color:var(--bad)}
+.msg.info{background:#F0EFEA;color:var(--ink2)}
+.editor-wrap{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.editor{position:relative;flex:0 1 420px;width:420px;max-width:100%;user-select:none;touch-action:none;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line)}
+.editor img{display:block;width:100%;pointer-events:none}
+.box{position:absolute;border:2.5px solid;cursor:move;background:rgba(255,255,255,0.08)}
+.box.eye{border-color:#2F5BEA}
+.box.mouth{border-color:#D9480F}
+.box .tag{position:absolute;left:-2px;top:-24px;font-size:12px;font-weight:700;color:#fff;padding:1px 7px;border-radius:4px 4px 0 0}
+.box.eye .tag{background:#2F5BEA}
+.box.mouth .tag{background:#D9480F}
+.box .h{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;border-radius:3px;background:#fff;border:2.5px solid;cursor:nwse-resize}
+.box.eye .h{border-color:#2F5BEA}
+.box.mouth .h{border-color:#D9480F}
+.side{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:16px}
+.crop{display:flex;flex-direction:column;gap:6px}
+.crop canvas{width:100%;max-width:360px;border:1px solid var(--line);border-radius:6px;background:#00FF00;image-rendering:auto}
+.crop .num{font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--ink2)}
+table{border-collapse:collapse;width:100%;font-size:14px;margin-top:18px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:13px;color:var(--ink2);font-weight:600}
+.tablebox{overflow-x:auto}
+.preview-wrap{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;margin-top:12px}
+#pv{width:360px;max-width:100%;aspect-ratio:2/3;border-radius:var(--radius);background:#EFE9DD;border:1px solid var(--line)}
+.criteria{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.crit{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:var(--radius)}
+.crit b{display:block;font-size:14px}
+.crit span.small{display:block}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tabs button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;cursor:pointer;min-height:36px}
+.tabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.check{display:inline-flex;align-items:center;gap:6px;font-size:14px;cursor:pointer}
+.check input{width:18px;height:18px}
+.slider{display:flex;align-items:center;gap:10px}
+.mark{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:15px;background:rgba(255,255,255,.92);border:2px solid var(--line);color:var(--ink2)}
+.card[aria-pressed="true"] .mark{background:var(--good);border-color:var(--good);color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;font-size:13px;color:var(--ink2)}
+@media (max-width:720px){
+  header{padding:12px 16px} .layout{padding:16px;gap:16px} nav{max-width:none;flex-direction:row;overflow-x:auto} nav button{flex:none}
+  section{padding:20px 16px} #keyInput{width:100%} .field{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>썰툰 캐릭터 검증기</h1>
+  <div class="seg" role="group" aria-label="실행 방식">
+    <button type="button" id="modeDemo" aria-pressed="true">데모 (키 없이)</button>
+    <button type="button" id="modeGemini" aria-pressed="false">Gemini</button>
+  </div>
+  <div class="field" id="keyField" hidden>
+    <label for="keyInput">API 키</label>
+    <input id="keyInput" type="password" autocomplete="off" placeholder="Google AI Studio API 키">
+    <label class="check"><input type="checkbox" id="rememberKey"> 이 브라우저에 기억</label>
+  </div>
+  <div class="field" id="modelField" hidden>
+    <label for="modelInput">모델</label>
+    <input id="modelInput" type="text" value="gemini-nano-banana-2.1">
+  </div>
+  <span class="small" id="counter">API 호출 0회</span>
+</header>
+
+<div class="layout">
+  <nav aria-label="검증 단계">
+    <button type="button" data-step="1"><span class="dot">1</span>캐릭터 시트</button>
+    <button type="button" data-step="2"><span class="dot">2</span>눈·입 위치</button>
+    <button type="button" data-step="3"><span class="dot">3</span>일관성 테스트</button>
+    <button type="button" data-step="4"><span class="dot">4</span>표정 5종</button>
+    <button type="button" data-step="5"><span class="dot">5</span>눈·입 파츠</button>
+    <button type="button" data-step="6"><span class="dot">6</span>미리보기·결과</button>
+  </nav>
+
+  <main>
+    <section id="s1">
+      <h2>1. 캐릭터 시트</h2>
+      <p class="lead">캐릭터를 설명하면 후보 4장을 만듭니다. 마음에 드는 1장을 고르면 이후 모든 단계의 기준이 됩니다.</p>
+      <label for="desc" class="small">캐릭터 설명 (영어로 쓰면 결과가 더 안정적입니다)</label>
+      <textarea id="desc">Korean woman in her early 30s, short black bob hair, gray knit cardigan over a white t-shirt, simple round face, friendly eyes</textarea>
+      <div class="row" style="margin-top:12px">
+        <button type="button" class="btn primary run" id="runSheet">후보 4장 만들기</button>
+        <span class="cost">API 4회</span>
+      </div>
+      <div class="grid g4" id="sheetGrid"></div>
+      <div class="row" style="margin-top:16px">
+        <button type="button" class="btn primary" id="confirmSheet" disabled>이 시트로 확정</button>
+        <span class="small" id="sheetNote"></span>
+      </div>
+    </section>
+
+    <section id="s2">
+      <h2>2. 눈·입 위치</h2>
+      <p class="lead">파란 박스는 눈, 주황 박스는 입입니다. 박스를 끌어서 옮기고, 오른쪽 아래 모서리를 끌어서 크기를 바꾸세요. 눈썹은 빼고 상하좌우에 조금 여유를 두면 됩니다.</p>
+      <div class="editor-wrap">
+        <div class="editor" id="editor">
+          <img id="editorImg" alt="기준 캐릭터 시트">
+          <div class="box eye" data-k="eye"><span class="tag">눈</span><i class="h"></i></div>
+          <div class="box mouth" data-k="mouth"><span class="tag">입</span><i class="h"></i></div>
+        </div>
+        <div class="side">
+          <div class="crop"><b>눈 영역 확대</b><canvas id="cropEye"></canvas><span class="num" id="numEye"></span></div>
+          <div class="crop"><b>입 영역 확대</b><canvas id="cropMouth"></canvas><span class="num" id="numMouth"></span></div>
+          <div class="row">
+            <button type="button" class="btn primary" id="confirmBoxes">이 위치로 확정</button>
+            <button type="button" class="btn" id="resetBoxes">처음 위치로</button>
+          </div>
+          <span class="small" id="boxNote"></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="s3">
+      <h2>3. 일관성 테스트</h2>
+      <p class="lead">기준 시트를 참고해 장면·각도가 다른 컷을 만듭니다. 기준과 <b>같은 사람으로 보이는 컷을 눌러서 체크</b>하세요. 80% 이상이면 합격입니다.</p>
+      <div class="row">
+        <label class="small" for="consCount">컷 수</label>
+        <select id="consCount" class="btn" style="font-weight:500">
+          <option value="5">5컷 (먼저 가볍게)</option>
+          <option value="10">10컷</option>
+          <option value="20" selected>20컷 (명세 기준)</option>
+        </select>
+        <button type="button" class="btn primary run" id="runCons">생성</button>
+        <span class="cost" id="consCost">API 20회</span>
+      </div>
+      <div class="row" style="margin-top:14px" id="consScoreRow" hidden>
+        <span id="consScore"></span>
+      </div>
+      <div class="grid g5" id="consGrid"></div>
+    </section>
+
+    <section id="s4">
+      <h2>4. 표정 5종</h2>
+      <p class="lead">기준 시트에서 표정만 바꾼 베이스를 만듭니다. 숫자는 얼굴 밖(머리·옷·배경)이 얼마나 바뀌었는지입니다. 낮을수록 좋고, 25를 넘으면 구도가 틀어진 것입니다.</p>
+      <div class="row">
+        <button type="button" class="btn primary run" id="runExpr">표정 만들기</button>
+        <span class="cost">API 4회 (기본 표정은 시트 그대로)</span>
+      </div>
+      <div class="grid g5" id="exprGrid"></div>
+      <div class="legend"><span><span class="badge good">10 이하</span> 양호</span><span><span class="badge warn">10~25</span> 주의</span><span><span class="badge bad">25 초과</span> 구도 틀어짐</span></div>
+    </section>
+
+    <section id="s5">
+      <h2>5. 눈·입 파츠</h2>
+      <p class="lead">표정마다 눈 감음, 입 조금, 입 크게를 만들고 박스 부분만 잘라 붙입니다. AI가 그림을 밀거나 색을 바꾼 경우 자동으로 맞춘 뒤 <b>이음매</b>(붙인 자리가 티 나는 정도)를 잽니다.</p>
+      <div class="row">
+        <button type="button" class="btn primary run" id="runParts">파츠 만들기</button>
+        <span class="cost">API 15회</span>
+        <div class="slider" style="margin-left:auto">
+          <label class="small" for="feather">경계 부드럽게</label>
+          <input type="range" id="feather" min="2" max="20" value="8">
+          <span class="small" id="featherVal">8px</span>
+        </div>
+      </div>
+      <div class="tablebox"><table id="partsTable"><thead><tr><th>표정</th><th>파츠</th><th>이음매 (보정 전 → 후)</th><th>자동 보정</th><th></th></tr></thead><tbody></tbody></table></div>
+      <div class="legend"><span><span class="badge good">2 이하</span> 양호</span><span><span class="badge warn">2~5</span> 확대하면 보임</span><span><span class="badge bad">5 초과</span> 실패 (박스 키우기 또는 경계 값 올리고 다시)</span></div>
+    </section>
+
+    <section id="s6">
+      <h2>6. 미리보기·결과</h2>
+      <p class="lead">만든 파츠로 눈 깜빡임과 말하기를 바로 재생합니다. 오른쪽은 0단계 합격 기준입니다.</p>
+      <div class="tabs" id="pvTabs"></div>
+      <div class="row" style="margin-top:10px">
+        <label class="check"><input type="checkbox" id="pvTalk" checked> 말하기</label>
+        <label class="check"><input type="checkbox" id="pvBlink" checked> 눈 깜빡임</label>
+        <label class="check"><input type="checkbox" id="pvGreen"> 원본 배경(초록) 보기</label>
+      </div>
+      <div class="preview-wrap">
+        <canvas id="pv" width="720" height="1080" aria-label="캐릭터 움직임 미리보기"></canvas>
+        <div class="criteria" id="criteria"></div>
+      </div>
+      <div class="row" style="margin-top:20px">
+        <button type="button" class="btn primary" id="exportZip">결과 파일 저장 (.zip)</button>
+        <button type="button" class="btn" id="copySummary">기록표용 요약 복사</button>
+        <span class="small" id="exportNote"></span>
+      </div>
+    </section>
+
+    <div class="status" id="status" role="status" aria-live="polite">
+      <div class="spinner"></div><span id="statusText"></span><div class="bar"><i id="statusBar"></i></div>
+      <button type="button" class="btn" id="cancelBtn">중단</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </main>
+</div>
+
+<script>
+'use strict';
+const W = 1024, H = 1536;
+const EXPRS = ['neutral', 'happy', 'angry', 'sad', 'surprised'];
+const EXPR_KO = { neutral: '기본', happy: '웃음', angry: '화남', sad: '슬픔', surprised: '놀람' };
+const EXPR_PROMPTS = {
+  neutral: 'calm neutral expression, eyes open, mouth closed',
+  happy: 'happy smiling expression, eyes open, mouth closed in a smile',
+  angry: 'angry expression, furrowed brows, eyes open, mouth closed',
+  sad: 'sad expression, drooping brows, eyes open, mouth closed',
+  surprised: 'surprised expression, raised brows, wide open eyes, mouth closed',
+};
+const STYLE = 'Korean webtoon style, clean line art, flat cel shading, front-facing upper body, centered, head and shoulders fill the upper half, plain solid pure green (#00FF00) background, no text, no watermark, consistent character design';
+const STYLE_NO_BG = STYLE.replace('plain solid pure green (#00FF00) background, ', '');
+const SCENES = ['standing in a living room at night', 'sitting at a kitchen table', 'walking on a city street', 'talking on a phone', 'arms crossed, looking annoyed', 'looking over the shoulder', 'three-quarter view, slight smile', 'side profile view', 'holding a coffee cup in a cafe', 'in an office in front of a laptop', 'pointing at someone off-screen', 'crying with hands on face', 'laughing loudly', 'shocked, hands raised', 'in a hospital hallway', 'at a wedding hall entrance', 'lying on a sofa', 'close-up of face', 'full body standing', 'under an umbrella in the rain'];
+const PART_EDITS = [
+  { file: 'eye_closed', box: 'eye', ko: '눈 감음', prompt: 'Close the eyes gently (eyes closed, as in a natural blink).' },
+  { file: 'mouth_1', box: 'mouth', ko: '입 조금', prompt: 'Make the mouth slightly open, as if mid-word.' },
+  { file: 'mouth_2', box: 'mouth', ko: '입 크게', prompt: 'Make the mouth wide open, as if speaking loudly.' },
+];
+const DEFAULT_BOXES = { eye: { x: 420, y: 488, w: 184, h: 68 }, mouth: { x: 460, y: 650, w: 104, h: 70 } };
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+const S = {
+  mode: 'demo', step: 1, busy: false, abort: false, calls: 0, api: null,
+  candidates: [], picked: -1, sheet: null, sheetData: null, sheetURL: '',
+  boxes: structuredClone(DEFAULT_BOXES), boxesOk: false,
+  cons: [], consOk: new Set(),
+  bases: {}, drift: {}, parts: {}, report: {}, variants: {},
+  timing: {}, log: [],
+};
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+
+/* ---------- 캔버스 도구 ---------- */
+function newCanvas(w = W, h = H) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function g2d(c) { return c.getContext('2d', { willReadFrequently: true }); }
+function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('이미지를 읽지 못했습니다.')); i.src = src; }); }
+function normalize(img) {
+  const c = newCanvas(), g = g2d(c);
+  g.fillStyle = '#00FF00'; g.fillRect(0, 0, W, H);
+  const s = Math.min(W / img.width, H / img.height), w = img.width * s, h = img.height * s;
+  g.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
+  return c;
+}
+const b64 = (c) => c.toDataURL('image/png').split(',')[1];
+const pixels = (c) => g2d(c).getImageData(0, 0, c.width, c.height);
+function thumb(c, w = 300) { const t = newCanvas(w, Math.round(w * c.height / c.width)); t.getContext('2d').drawImage(c, 0, 0, t.width, t.height); return t.toDataURL('image/jpeg', 0.88); }
+function crop(c, b) { const o = newCanvas(b.w, b.h); o.getContext('2d').drawImage(c, b.x, b.y, b.w, b.h, 0, 0, b.w, b.h); return o; }
+const inBox = (x, y, b) => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+
+function meanDiff(A, B, { region, exclude = [], step = 1 } = {}) {
+  const w = A.width, r = region || { x: 0, y: 0, w: A.width, h: A.height };
+  let s = 0, n = 0;
+  for (let y = r.y; y < r.y + r.h; y += step) for (let x = r.x; x < r.x + r.w; x += step) {
+    if (exclude.some((b) => inBox(x, y, b))) continue;
+    const i = (y * w + x) * 4;
+    s += Math.abs(A.data[i] - B.data[i]) + Math.abs(A.data[i + 1] - B.data[i + 1]) + Math.abs(A.data[i + 2] - B.data[i + 2]);
+    n += 3;
+  }
+  return n ? s / n : 0;
+}
+function ring(b, r) { return [{ x: b.x, y: b.y, w: b.w, h: r }, { x: b.x, y: b.y + b.h - r, w: b.w, h: r }, { x: b.x, y: b.y, w: r, h: b.h }, { x: b.x + b.w - r, y: b.y, w: r, h: b.h }]; }
+function seamDiff(A, B, b, r = 8) { const v = ring(b, r).map((s) => meanDiff(A, B, { region: s })); return v.reduce((a, c) => a + c, 0) / v.length; }
+function gray(D) { const g = new Uint8Array(D.width * D.height); for (let i = 0, j = 0; j < g.length; i += 4, j++) g[j] = (D.data[i] * 77 + D.data[i + 1] * 150 + D.data[i + 2] * 29) >> 8; return g; }
+
+/** AI가 그림 전체를 몇 px 밀었으면 박스 주변을 기준으로 되돌림 */
+function alignTo(baseD, edited, b, range = 8, margin = 60) {
+  const area = { x: Math.max(0, b.x - margin), y: Math.max(0, b.y - margin) };
+  area.w = Math.min(W, b.x + b.w + margin) - area.x; area.h = Math.min(H, b.y + b.h + margin) - area.y;
+  const g0 = gray(baseD), g1 = gray(pixels(edited));
+  let best = { dx: 0, dy: 0, err: Infinity };
+  for (let dy = -range; dy <= range; dy++) for (let dx = -range; dx <= range; dx++) {
+    let err = 0;
+    for (let y = area.y; y < area.y + area.h; y += 2) for (let x = area.x; x < area.x + area.w; x += 2) {
+      if (inBox(x, y, b)) continue;
+      const sx = x + dx, sy = y + dy;
+      if (sx < 0 || sy < 0 || sx >= W || sy >= H) { err += 255; continue; }
+      err += Math.abs(g0[y * W + x] - g1[sy * W + sx]);
+    }
+    if (err < best.err) best = { dx, dy, err };
+  }
+  if (!best.dx && !best.dy) return { canvas: edited, dx: 0, dy: 0 };
+  const c = newCanvas(), g = g2d(c);
+  g.fillStyle = '#00FF00'; g.fillRect(0, 0, W, H); g.drawImage(edited, -best.dx, -best.dy);
+  return { canvas: c, dx: best.dx, dy: best.dy };
+}
+function ringMean(D, b, r = 8) {
+  const s = [0, 0, 0]; let n = 0;
+  for (const st of ring(b, r)) for (let y = st.y; y < st.y + st.h; y++) for (let x = st.x; x < st.x + st.w; x++) {
+    const i = (y * D.width + x) * 4; s[0] += D.data[i]; s[1] += D.data[i + 1]; s[2] += D.data[i + 2]; n++;
+  }
+  return s.map((v) => v / n);
+}
+/** 편집본의 밝기·색감을 박스 테두리 기준으로 원본에 맞춤 */
+function matchColors(baseD, c, b) {
+  const D = pixels(c), mb = ringMean(baseD, b), me = ringMean(D, b);
+  const gain = mb.map((v, i) => (me[i] > 1 ? v / me[i] : 1));
+  if (gain.every((k) => Math.abs(k - 1) < 0.003)) return { canvas: c, gain: [1, 1, 1] };
+  for (let i = 0; i < D.data.length; i += 4) for (let k = 0; k < 3; k++) D.data[i + k] = Math.min(255, D.data[i + k] * gain[k]);
+  const o = newCanvas(); g2d(o).putImageData(D, 0, 0);
+  return { canvas: o, gain };
+}
+function featherPart(c, b, f) {
+  const p = crop(c, b), g = g2d(p), D = g.getImageData(0, 0, b.w, b.h);
+  for (let y = 0; y < b.h; y++) for (let x = 0; x < b.w; x++) {
+    const d = Math.min(x, y, b.w - 1 - x, b.h - 1 - y), k = d >= f ? 1 : d / f;
+    const i = (y * b.w + x) * 4 + 3; D.data[i] = Math.round(D.data[i] * k);
+  }
+  g.putImageData(D, 0, 0); return p;
+}
+function chromaKey(D) {
+  for (let i = 0; i < D.data.length; i += 4) {
+    const r = D.data[i], gg = D.data[i + 1], b = D.data[i + 2], gr = gg - Math.max(r, b);
+    if (gr > 90) D.data[i + 3] = 0;
+    else if (gr > 40) { D.data[i + 3] = Math.round(255 * (1 - (gr - 40) / 50)); D.data[i + 1] = Math.max(r, b); }
+  }
+  return D;
+}
+
+/* ---------- 데모용 가짜 캐릭터 ---------- */
+let mockN = 0;
+function mockSVG(expr, eye, mouth, dx = 0, dy = 0) {
+  const cx = W / 2 + dx;
+  const brow = { neutral: 'M-70 0 h50 M20 0 h50', happy: 'M-70 4 q25 -12 50 0 M20 4 q25 -12 50 0', angry: 'M-70 -8 l50 14 M20 6 l50 -14', sad: 'M-70 6 l50 -12 M20 -6 l50 12', surprised: 'M-70 -10 q25 -14 50 0 M20 -10 q25 -14 50 0' }[expr];
+  const ry = expr === 'surprised' ? 22 : 18;
+  const eyes = eye === 'open'
+    ? `<ellipse cx="-45" cy="0" rx="16" ry="${ry}" fill="#2b2b2b"/><ellipse cx="45" cy="0" rx="16" ry="${ry}" fill="#2b2b2b"/><circle cx="-40" cy="-6" r="5" fill="#fff"/><circle cx="50" cy="-6" r="5" fill="#fff"/>`
+    : '<path d="M-62 2 q17 10 34 0 M28 2 q17 10 34 0" stroke="#2b2b2b" stroke-width="5" fill="none" stroke-linecap="round"/>';
+  const smile = expr === 'happy' ? 10 : expr === 'sad' ? -8 : 0;
+  const m = mouth === 0
+    ? `<path d="M-28 0 q28 ${smile} 56 0" stroke="#7a3b3b" stroke-width="5" fill="none" stroke-linecap="round"/>`
+    : `<ellipse cx="0" cy="${mouth === 1 ? 2 : 6}" rx="${mouth === 1 ? 20 : 26}" ry="${mouth === 1 ? 9 : 20}" fill="#7a3b3b"/>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="100%" height="100%" fill="#00FF00"/><g transform="translate(0 ${dy})">
+<path d="M${cx - 320} ${H} q0 -600 320 -600 q320 0 320 600 z" fill="#8a8f9c" stroke="#333" stroke-width="5"/>
+<rect x="${cx - 55}" y="790" width="110" height="176" fill="#f6d7c3" stroke="#333" stroke-width="5"/>
+<ellipse cx="${cx}" cy="560" rx="230" ry="270" fill="#f6d7c3" stroke="#333" stroke-width="5"/>
+<path d="M${cx - 240} 560 q-10 -330 240 -330 q250 0 240 330 q-40 -170 -240 -200 q-200 30 -240 200 z" fill="#3a2a22" stroke="#333" stroke-width="5"/>
+<g transform="translate(${cx} 460)"><path d="${brow}" stroke="#3a2a22" stroke-width="8" fill="none" stroke-linecap="round"/></g>
+<g transform="translate(${cx} 520)">${eyes}</g>
+<path d="M${cx} 560 l-8 50 h16" stroke="#c99" stroke-width="4" fill="none"/>
+<g transform="translate(${cx} 680)">${m}</g></g></svg>`;
+}
+async function mockDraw(expr, eye, mouth, dx, dy, bright) {
+  await new Promise((r) => setTimeout(r, 120));
+  const img = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(mockSVG(expr, eye, mouth, dx, dy)));
+  const c = newCanvas(), g = g2d(c);
+  if (bright) g.filter = `brightness(${bright})`;
+  g.drawImage(img, 0, 0, W, H); return c;
+}
+const pickExpr = (p) => EXPRS.find((e) => p.toLowerCase().includes(e)) || 'neutral';
+
+/* ---------- Gemini 호출 ---------- */
+class AppError extends Error { constructor(msg, retry = false) { super(msg); this.retry = retry; } }
+class Cancelled extends Error {}
+
+function findImage(obj) {
+  let found = null;
+  (function walk(o) {
+    if (!o || typeof o !== 'object') return;
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    if (o.type === 'image' && typeof o.data === 'string' && o.data.length > 100) found = o.data;
+    const inl = o.inlineData || o.inline_data;
+    if (inl && typeof inl.data === 'string' && inl.data.length > 100) found = inl.data;
+    for (const k in o) if (k !== 'thought' && k !== 'summary') walk(o[k]);
+  })(obj);
+  return found;
+}
+function findText(obj) {
+  const out = [];
+  (function walk(o) { if (!o || typeof o !== 'object') return; if (Array.isArray(o)) { o.forEach(walk); return; } if (typeof o.text === 'string') out.push(o.text); for (const k in o) walk(o[k]); })(obj);
+  return out.join(' ').slice(0, 300);
+}
+async function httpError(r) {
+  let detail = '';
+  try { const j = await r.json(); const e = Array.isArray(j) ? j[0] : j; detail = e?.error?.message || JSON.stringify(j).slice(0, 300); } catch { detail = ''; }
+  if (r.status === 400 && /api key/i.test(detail)) return new AppError('API 키가 올바르지 않습니다. 키를 다시 확인해 주세요.');
+  if (r.status === 401 || r.status === 403) return new AppError(`API 키 권한 문제입니다 (${r.status}). 키가 Gemini API용인지, 결제·사용 설정이 되어 있는지 확인해 주세요.\n${detail}`);
+  if (r.status === 404) return new AppError(`모델을 찾지 못했습니다: ${S.model()}\n맨 위 '모델' 칸의 이름을 확인해 주세요.\n${detail}`);
+  if (r.status === 429 && /free tier/i.test(detail) && /limit: 0/i.test(detail)) return new AppError(`무료 등급에서는 이 이미지 모델을 쓸 수 없습니다 (하루 0회).\nGoogle AI Studio에서 결제(유료 등급)를 켠 뒤 다시 시도해 주세요: https://aistudio.google.com/apikey\n원문: ${detail}`);
+  if (r.status === 429) return new AppError(`요청 한도에 걸렸습니다. 잠시 후 자동으로 다시 시도합니다.\n${detail}`, true);
+  if (r.status >= 500) return new AppError(`Gemini 서버 오류 (${r.status}). 다시 시도합니다.`, true);
+  return new AppError(`요청이 거절됐습니다 (${r.status}).\n${detail}`);
+}
+async function post(url, body) {
+  let r;
+  try {
+    r = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': S.key() }, body: JSON.stringify(body) });
+  } catch (e) {
+    throw new AppError('Gemini 서버에 접속하지 못했습니다.\n인터넷 연결을 확인해 주세요. 회사 네트워크가 막고 있다면 다른 네트워크에서 열거나, 이 파일을 크롬·엣지 최신 버전에서 열어 주세요.');
+  }
+  return r;
+}
+async function gemini(text, images = []) {
+  const imgs = images.map(b64);
+  if (S.api !== 'generate') {
+    const r = await post(`${GEMINI_BASE}/interactions`, {
+      model: S.model(),
+      input: [{ type: 'text', text }, ...imgs.map((d) => ({ type: 'image', mime_type: 'image/png', data: d }))],
+      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '2:3', image_size: '1K' },
+    });
+    if (r.ok) { S.api = 'interactions'; return decode(await r.json()); }
+    const err = await httpError(r);
+    if (S.api === 'interactions' || r.status !== 404) throw err;
+  }
+  const r = await post(`${GEMINI_BASE}/models/${encodeURIComponent(S.model())}:generateContent`, {
+    contents: [{ role: 'user', parts: [{ text }, ...imgs.map((d) => ({ inline_data: { mime_type: 'image/png', data: d } }))] }],
+    generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: '2:3' } },
+  });
+  if (!r.ok) throw await httpError(r);
+  S.api = 'generate';
+  return decode(await r.json());
+}
+async function decode(json) {
+  const data = findImage(json);
+  if (!data) throw new AppError('이미지가 오지 않았습니다. 안전 필터에 걸렸거나 모델이 글만 답했을 수 있습니다.\n응답: ' + (findText(json) || '(내용 없음)'), true);
+  return normalize(await loadImg('data:image/jpeg;base64,' + data));
+}
+async function withRetry(fn) {
+  for (let i = 1; ; i++) {
+    if (S.abort) throw new Cancelled();
+    try { return await fn(); } catch (e) {
+      if (e instanceof Cancelled || !(e instanceof AppError) || !e.retry || i >= 3) throw e;
+      await new Promise((r) => setTimeout(r, i * 4000));
+    }
+  }
+}
+const provider = {
+  async generate(prompt, refs = []) {
+    S.calls++; renderCounter();
+    if (S.mode === 'demo') return mockDraw(pickExpr(prompt), 'open', 0, 0, 0);
+    const text = refs.length ? `Draw the SAME character shown in the reference image(s). Keep face, hair, outfit, colors and art style identical. ${prompt}` : prompt;
+    return withRetry(() => gemini(text, refs.slice(0, 4)));
+  },
+  async edit(image, prompt) {
+    S.calls++; renderCounter();
+    if (S.mode === 'demo') {
+      const p = prompt.toLowerCase();
+      const eye = p.includes('eyes closed') ? 'closed' : 'open';
+      const mouth = /mouth (wide|slightly) open/.test(p) ? (p.includes('mouth wide') ? 2 : 1) : 0;
+      mockN++;
+      return mockDraw(pickExpr(p), eye, mouth, (mockN % 5) - 2, ((mockN * 3) % 7) - 3, 1.02);
+    }
+    const text = `Edit this image. ${prompt} Change ONLY that part. Keep everything else pixel-identical: same framing, size, position, line art, colors and background. Do not move, crop or zoom.`;
+    return withRetry(() => gemini(text, [image]));
+  },
+};
+S.key = () => $('#keyInput').value.trim();
+S.model = () => $('#modelInput').value.trim() || 'gemini-nano-banana-2.1';
+
+/* ---------- 실행 틀 ---------- */
+function setStatus(text, done, total) {
+  $('#status').classList.add('show');
+  $('#statusText').textContent = `${text}  (${done}/${total})`;
+  $('#statusBar').style.width = `${total ? (done / total) * 100 : 0}%`;
+}
+function showMsg(text, kind = 'error') { const m = $('#msg'); m.textContent = text; m.className = `msg show ${kind}`; }
+function clearMsg() { $('#msg').className = 'msg'; }
+async function run(name, total, fn) {
+  if (S.busy) return;
+  if (S.mode === 'gemini' && !S.key()) { showMsg('맨 위 'API 키' 칸에 Gemini API 키를 먼저 입력해 주세요.'); $('#keyInput').focus(); return; }
+  S.busy = true; S.abort = false; clearMsg(); renderBusy();
+  const t0 = performance.now(), c0 = S.calls;
+  let done = 0;
+  const tick = (label) => { setStatus(label, done, total); };
+  const next = () => { done++; };
+  try {
+    await fn(tick, next);
+    const sec = (performance.now() - t0) / 1000;
+    S.timing[name] = sec;
+    S.log.push({ step: name, mode: S.mode, seconds: sec.toFixed(1), calls: S.calls - c0, at: new Date().toLocaleTimeString() });
+  } catch (e) {
+    if (e instanceof Cancelled) showMsg('중단했습니다. 지금까지 만든 결과는 남아 있습니다.', 'info');
+    else { console.error(e); showMsg(e.message || String(e)); }
+  } finally {
+    S.busy = false; $('#status').classList.remove('show'); renderBusy(); renderAll();
+  }
+}
+$('#cancelBtn').onclick = () => { S.abort = true; $('#statusText').textContent = '현재 요청이 끝나면 멈춥니다…'; };
+function checkAbort() { if (S.abort) throw new Cancelled(); }
+
+/* ---------- 1. 시트 ---------- */
+$('#runSheet').onclick = () => run('시트', 4, async (tick, next) => {
+  const prompt = `Character sheet of one character: ${$('#desc').value.trim()}. ${EXPR_PROMPTS.neutral}. ${STYLE}`;
+  S.candidates = []; S.picked = -1; renderSheet();
+  for (let i = 0; i < 4; i++) {
+    tick(`시트 후보 ${i + 1} 생성 중`);
+    const c = await provider.generate(prompt);
+    S.candidates.push({ canvas: c, url: thumb(c) }); next(); renderSheet();
+  }
+});
+$('#confirmSheet').onclick = () => {
+  if (S.picked < 0) return;
+  const hasLater = Object.keys(S.bases).length || S.cons.length;
+  if (hasLater && !confirm('시트를 바꾸면 일관성·표정·파츠 결과가 지워집니다. 계속할까요?')) return;
+  const c = S.candidates[S.picked].canvas;
+  S.sheet = c; S.sheetData = pixels(c); S.sheetURL = c.toDataURL('image/png');
+  S.cons = []; S.consOk = new Set(); S.bases = {}; S.drift = {}; S.parts = {}; S.report = {}; S.variants = {}; S.boxesOk = false;
+  renderAll(); go(2);
+};
+function renderSheet() {
+  const grid = $('#sheetGrid'); grid.replaceChildren();
+  S.candidates.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'card'; b.setAttribute('aria-pressed', String(S.picked === i));
+    b.innerHTML = `<img alt="시트 후보 ${i + 1}"><div class="cap"><span>후보 ${i + 1}</span>${S.sheet === c.canvas ? '<span class="badge good">확정</span>' : ''}</div>`;
+    b.querySelector('img').src = c.url;
+    b.onclick = () => { S.picked = i; renderSheet(); };
+    grid.append(b);
+  });
+  $('#confirmSheet').disabled = S.picked < 0 || S.busy;
+  $('#sheetNote').textContent = S.candidates.length && S.picked < 0 ? '마음에 드는 후보를 눌러서 고르세요.' : '';
+}
+
+/* ---------- 2. 박스 ---------- */
+const editor = $('#editor');
+function placeBoxes() {
+  for (const k of ['eye', 'mouth']) {
+    const b = S.boxes[k], el = editor.querySelector(`.box.${k}`);
+    Object.assign(el.style, { left: `${(b.x / W) * 100}%`, top: `${(b.y / H) * 100}%`, width: `${(b.w / W) * 100}%`, height: `${(b.h / H) * 100}%` });
+  }
+  drawCrops();
+}
+function drawCrops() {
+  if (!S.sheet) return;
+  for (const [k, id, num] of [['eye', '#cropEye', '#numEye'], ['mouth', '#cropMouth', '#numMouth']]) {
+    const b = S.boxes[k], c = $(id); c.width = b.w * 2; c.height = b.h * 2;
+    c.getContext('2d').drawImage(S.sheet, b.x, b.y, b.w, b.h, 0, 0, c.width, c.height);
+    $(num).textContent = `x ${b.x}, y ${b.y}, 너비 ${b.w}, 높이 ${b.h}`;
+  }
+}
+let drag = null;
+editor.addEventListener('pointerdown', (e) => {
+  const boxEl = e.target.closest('.box'); if (!boxEl || S.busy) return;
+  e.preventDefault(); editor.setPointerCapture(e.pointerId);
+  const k = boxEl.dataset.k;
+  drag = { k, mode: e.target.classList.contains('h') ? 'resize' : 'move', sx: e.clientX, sy: e.clientY, start: { ...S.boxes[k] }, scale: W / editor.clientWidth };
+});
+editor.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = Math.round((e.clientX - drag.sx) * drag.scale), dy = Math.round((e.clientY - drag.sy) * drag.scale), b = { ...drag.start };
+  if (drag.mode === 'move') { b.x = Math.max(0, Math.min(W - b.w, b.x + dx)); b.y = Math.max(0, Math.min(H - b.h, b.y + dy)); }
+  else { b.w = Math.max(24, Math.min(W - b.x, b.w + dx)); b.h = Math.max(24, Math.min(H - b.y, b.h + dy)); }
+  S.boxes[drag.k] = b; requestAnimationFrame(placeBoxes);
+});
+editor.addEventListener('pointerup', () => { if (drag) { drag = null; if (S.boxesOk) { S.boxesOk = false; renderNav(); $('#boxNote').textContent = '위치를 바꿨습니다. 다시 확정해 주세요.'; } } });
+$('#resetBoxes').onclick = () => { S.boxes = structuredClone(DEFAULT_BOXES); S.boxesOk = false; placeBoxes(); renderNav(); };
+$('#confirmBoxes').onclick = () => {
+  const ov = S.boxes.eye, mv = S.boxes.mouth;
+  if (!(ov.x + ov.w <= mv.x || mv.x + mv.w <= ov.x || ov.y + ov.h <= mv.y || mv.y + mv.h <= ov.y)) { $('#boxNote').textContent = '눈 박스와 입 박스가 겹칩니다. 떨어뜨려 주세요.'; return; }
+  if (Object.keys(S.parts).length && !confirm('위치를 바꾸면 이미 만든 파츠가 지워집니다. 계속할까요?')) return;
+  S.parts = {}; S.report = {}; S.variants = {};
+  S.boxesOk = true; $('#boxNote').textContent = ''; renderAll(); go(Object.keys(S.bases).length ? 5 : 3);
+};
+
+/* ---------- 3. 일관성 ---------- */
+$('#consCount').onchange = () => { $('#consCost').textContent = `API ${$('#consCount').value}회`; };
+$('#runCons').onclick = () => {
+  const n = Number($('#consCount').value);
+  run('일관성', n, async (tick, next) => {
+    S.cons = []; S.consOk = new Set(); renderCons();
+    for (let i = 0; i < n; i++) {
+      tick(`컷 ${i + 1}: ${SCENES[i]}`);
+      const c = await provider.generate(`${$('#desc').value.trim()}. Scene: ${SCENES[i]}. ${STYLE_NO_BG}`, [S.sheet]);
+      S.cons.push({ url: thumb(c), scene: SCENES[i] }); next(); renderCons();
+    }
+  });
+};
+function renderCons() {
+  const grid = $('#consGrid'); grid.replaceChildren();
+  if (S.sheet && S.cons.length) {
+    const ref = document.createElement('div'); ref.className = 'card static';
+    ref.innerHTML = '<img alt="기준 시트"><div class="cap"><span>기준 시트</span></div>';
+    ref.querySelector('img').src = S.candidates[S.picked]?.url || thumb(S.sheet);
+    grid.append(ref);
+  }
+  S.cons.forEach((c, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'card';
+    b.setAttribute('aria-pressed', String(S.consOk.has(i)));
+    b.innerHTML = `<img alt="컷 ${i + 1}"><span class="mark" aria-hidden="true">✓</span><div class="cap"><span>${i + 1}</span></div>`;
+    b.querySelector('img').src = c.url; b.title = c.scene;
+    b.onclick = () => { S.consOk.has(i) ? S.consOk.delete(i) : S.consOk.add(i); renderCons(); renderNav(); };
+    grid.append(b);
+  });
+  const row = $('#consScoreRow');
+  row.hidden = !S.cons.length;
+  if (S.cons.length) {
+    const ok = S.consOk.size, n = S.cons.length, pass = ok / n >= 0.8;
+    $('#consScore').innerHTML = `같은 사람: <b>${ok} / ${n}</b> &nbsp;<span class="badge ${pass ? 'good' : 'bad'}">${pass ? '합격 (80% 이상)' : `불합격 · ${Math.ceil(n * 0.8)}컷 이상 필요`}</span>`;
+  }
+}
+
+/* ---------- 4. 표정 ---------- */
+$('#runExpr').onclick = () => run('표정', 4, async (tick, next) => {
+  S.bases = { neutral: S.sheet }; S.drift = { neutral: 0 }; S.parts = {}; S.report = {}; S.variants = {}; renderExpr();
+  for (const ex of EXPRS.slice(1)) {
+    tick(`${EXPR_KO[ex]} 표정 생성 중`);
+    const c = await provider.edit(S.sheet, `Change the facial expression to: ${ex}, ${EXPR_PROMPTS[ex]}.`);
+    S.bases[ex] = c;
+    S.drift[ex] = meanDiff(S.sheetData, pixels(c), { exclude: [S.boxes.eye, S.boxes.mouth], step: 2 });
+    next(); renderExpr();
+  }
+});
+const driftBadge = (v) => (v <= 10 ? 'good' : v <= 25 ? 'warn' : 'bad');
+function renderExpr() {
+  const grid = $('#exprGrid'); grid.replaceChildren();
+  for (const ex of EXPRS) {
+    const c = S.bases[ex]; if (!c) continue;
+    const d = document.createElement('div'); d.className = 'card static';
+    d.innerHTML = `<img alt="${EXPR_KO[ex]} 표정"><div class="cap"><span>${EXPR_KO[ex]}</span><span class="badge ${ex === 'neutral' ? 'none' : driftBadge(S.drift[ex])}">${ex === 'neutral' ? '기준' : S.drift[ex].toFixed(1)}</span></div>`;
+    d.querySelector('img').src = thumb(c); grid.append(d);
+  }
+}
+
+/* ---------- 5. 파츠 ---------- */
+$('#feather').oninput = () => { $('#featherVal').textContent = `${$('#feather').value}px`; };
+async function makeParts(ex, tick, next) {
+  const base = S.bases[ex], baseD = pixels(base), f = Number($('#feather').value);
+  S.parts[ex] = { eye_open: crop(base, S.boxes.eye), mouth_0: crop(base, S.boxes.mouth) };
+  S.report[ex] = [];
+  for (const pe of PART_EDITS) {
+    checkAbort();
+    tick(`${EXPR_KO[ex]} · ${pe.ko} 생성 중`);
+    const b = S.boxes[pe.box];
+    const raw = await provider.edit(base, `Keep the ${ex} expression. ${pe.prompt}`);
+    const before = seamDiff(baseD, pixels(raw), b);
+    const al = alignTo(baseD, raw, b);
+    const mc = matchColors(baseD, al.canvas, b);
+    const after = seamDiff(baseD, pixels(mc.canvas), b);
+    S.parts[ex][pe.file] = featherPart(mc.canvas, b, f);
+    S.report[ex].push({ part: pe.file, ko: pe.ko, before, after, dx: al.dx, dy: al.dy, gain: mc.gain });
+    delete S.variants[ex];
+    next(); renderParts();
+  }
+}
+$('#runParts').onclick = () => run('파츠', 15, async (tick, next) => {
+  S.parts = {}; S.report = {}; S.variants = {}; renderParts();
+  for (const ex of EXPRS) await makeParts(ex, tick, next);
+});
+const seamBadge = (v) => (v <= 2 ? 'good' : v <= 5 ? 'warn' : 'bad');
+function renderParts() {
+  const tb = $('#partsTable tbody'); tb.replaceChildren();
+  for (const ex of EXPRS) {
+    const rows = S.report[ex]; if (!rows) continue;
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      const fixes = [r.dx || r.dy ? `위치 ${r.dx}, ${r.dy}px` : '', r.gain.some((g) => g !== 1) ? `색 ${r.gain.map((g) => g.toFixed(3)).join(' / ')}` : ''].filter(Boolean).join(' · ') || '없음';
+      tr.innerHTML = `<td>${i === 0 ? `<b>${EXPR_KO[ex]}</b>` : ''}</td><td>${r.ko}</td><td>${r.before.toFixed(1)} → <span class="badge ${seamBadge(r.after)}">${r.after.toFixed(1)}</span></td><td class="small">${fixes}</td><td></td>`;
+      if (i === 0) {
+        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn run'; btn.textContent = '이 표정만 다시';
+        btn.disabled = S.busy;
+        btn.onclick = () => run(`파츠 ${EXPR_KO[ex]}`, 3, async (tick, next) => { await makeParts(ex, tick, next); });
+        tr.lastElementChild.append(btn);
+      }
+      tb.append(tr);
+    });
+  }
+}
+
+/* ---------- 6. 미리보기 ---------- */
+let pvExpr = 'neutral';
+function variant(ex, eyeClosed, mouth) {
+  const key = `${eyeClosed ? 1 : 0}${mouth}`;
+  S.variants[ex] ||= {};
+  const green = $('#pvGreen').checked, vk = key + (green ? 'g' : '');
+  if (S.variants[ex][vk]) return S.variants[ex][vk];
+  const p = S.parts[ex], c = newCanvas(720, 1080), g = g2d(c), sc = 720 / W;
+  const full = newCanvas(), fg = g2d(full);
+  fg.drawImage(S.bases[ex], 0, 0);
+  fg.drawImage(eyeClosed ? p.eye_closed : p.eye_open, S.boxes.eye.x, S.boxes.eye.y);
+  fg.drawImage(p[`mouth_${mouth}`], S.boxes.mouth.x, S.boxes.mouth.y);
+  g.drawImage(full, 0, 0, W * sc, H * sc);
+  if (!green) { const D = chromaKey(g.getImageData(0, 0, 720, 1080)); g.putImageData(D, 0, 0); }
+  S.variants[ex][vk] = c; return c;
+}
+const MOUTH_CYCLE = [0, 1, 2, 1];
+function animate(ts) {
+  requestAnimationFrame(animate);
+  if (S.step !== 6 || !S.parts[pvExpr]?.mouth_2) return;
+  const t = ts / 1000, phase = t % 3.2;
+  const closed = $('#pvBlink').checked && phase > 2.9 && phase < 3.05;
+  const talkOn = $('#pvTalk').checked && (t % 4) < 2.4;
+  const mouth = talkOn ? MOUTH_CYCLE[Math.floor(t * 10) % 4] : 0;
+  const pv = $('#pv'), g = pv.getContext('2d');
+  g.clearRect(0, 0, pv.width, pv.height);
+  g.drawImage(variant(pvExpr, closed, mouth), 0, 0);
+}
+requestAnimationFrame(animate);
+$('#pvGreen').onchange = () => { S.variants = {}; };
+function renderPreview() {
+  const tabs = $('#pvTabs'); tabs.replaceChildren();
+  for (const ex of EXPRS) {
+    if (!S.parts[ex]?.mouth_2) continue;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = EXPR_KO[ex];
+    b.setAttribute('aria-pressed', String(ex === pvExpr)); b.onclick = () => { pvExpr = ex; renderPreview(); };
+    tabs.append(b);
+  }
+  if (!S.parts[pvExpr]?.mouth_2) pvExpr = EXPRS.find((e) => S.parts[e]?.mouth_2) || 'neutral';
+  renderCriteria();
+}
+function summary() {
+  const n = S.cons.length, ok = S.consOk.size;
+  const drifts = EXPRS.slice(1).map((e) => S.drift[e]).filter((v) => v != null);
+  const seams = Object.values(S.report).flat().map((r) => r.after);
+  const time = ['시트', '표정', '파츠'].reduce((a, k) => a + (S.timing[k] || 0), 0);
+  return {
+    cons: n ? { text: `${ok} / ${n}컷`, pass: ok / n >= 0.8 } : null,
+    expr: drifts.length === 4 ? { text: `얼굴 밖 변화 최대 ${Math.max(...drifts).toFixed(1)}`, pass: Math.max(...drifts) <= 25 } : null,
+    parts: seams.length === 15 ? { text: `이음매 최대 ${Math.max(...seams).toFixed(1)}`, pass: Math.max(...seams) <= 5 } : null,
+    time: S.timing['파츠'] ? { text: `${(time / 60).toFixed(1)}분 · API ${S.calls}회`, pass: time <= 1800 } : null,
+  };
+}
+function renderCriteria() {
+  const s = summary(), box = $('#criteria'); box.replaceChildren();
+  const items = [['캐릭터 일관성', '같은 사람으로 보이는 컷 80% 이상', s.cons], ['표정 일관성', '얼굴 밖 변화 25 이하 + 눈으로 확인', s.expr], ['파츠 정합', '모든 파츠 이음매 5 이하', s.parts], ['작업 시간', '시트+표정+파츠 30분 이내', s.time]];
+  for (const [t, rule, v] of items) {
+    const d = document.createElement('div'); d.className = 'crit';
+    d.innerHTML = `<div><b>${t}</b><span class="small">${rule}</span><span class="small">${v ? v.text : '아직 측정 전'}</span></div><span class="badge ${v ? (v.pass ? 'good' : 'bad') : 'none'}">${v ? (v.pass ? '합격' : '불합격') : '대기'}</span>`;
+    box.append(d);
+  }
+  if (S.mode === 'demo') { const n = document.createElement('p'); n.className = 'small'; n.textContent = '데모 모드 결과입니다. 실제 판정은 Gemini 모드로 다시 진행하세요.'; box.append(n); }
+}
+async function canvasBlob(c) { return new Promise((r) => c.toBlob(r, 'image/png')); }
+$('#exportZip').onclick = async () => {
+  if (typeof JSZip === 'undefined') { $('#exportNote').textContent = '압축 도구를 불러오지 못했습니다 (인터넷 연결 확인).'; return; }
+  $('#exportNote').textContent = '압축하는 중…';
+  const zip = new JSZip();
+  if (S.sheet) zip.file('sheet.png', await canvasBlob(S.sheet));
+  zip.file('character.json', JSON.stringify({ description: $('#desc').value.trim(), eye_box: S.boxes.eye, mouth_box: S.boxes.mouth }, null, 2));
+  for (const ex of EXPRS) {
+    if (S.bases[ex]) zip.file(`assets/${ex}/base.png`, await canvasBlob(S.bases[ex]));
+    for (const [k, c] of Object.entries(S.parts[ex] || {})) zip.file(`assets/${ex}/${k}.png`, await canvasBlob(c));
+  }
+  const rows = ['expression,part,seam_before,seam_after,shift_dx,shift_dy'];
+  for (const ex of EXPRS) for (const r of S.report[ex] || []) rows.push([ex, r.part, r.before.toFixed(1), r.after.toFixed(1), r.dx, r.dy].join(','));
+  zip.file('parts-report.csv', '﻿' + rows.join('\n'));
+  zip.file('log.csv', '﻿' + ['step,mode,seconds,api_calls,time', ...S.log.map((l) => [l.step, l.mode, l.seconds, l.calls, l.at].join(','))].join('\n'));
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `sseoltoon-${S.mode}-hero.zip`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  $('#exportNote').textContent = '저장했습니다.';
+};
+$('#copySummary').onclick = async () => {
+  const s = summary(), f = (v) => (v ? `${v.text} (${v.pass ? '합격' : '불합격'})` : '측정 전');
+  const text = [`API: ${S.mode === 'demo' ? '데모' : S.model()}`, `일관성: ${f(s.cons)}`, `표정: ${f(s.expr)}`, `파츠: ${f(s.parts)}`, `시간: ${f(s.time)}`].join('\n');
+  try { await navigator.clipboard.writeText(text); $('#exportNote').textContent = '복사했습니다. 명세서 기록표에 붙여넣으세요.'; }
+  catch { $('#exportNote').textContent = text; }
+};
+
+/* ---------- 화면 갱신 ---------- */
+function renderCounter() { $('#counter').textContent = `${S.mode === 'demo' ? '데모 호출' : 'API 호출'} ${S.calls}회`; }
+function stepState() {
+  return {
+    1: { on: true, done: !!S.sheet },
+    2: { on: !!S.sheet, done: S.boxesOk },
+    3: { on: !!S.sheet, done: S.cons.length > 0 && S.consOk.size / S.cons.length >= 0.8 },
+    4: { on: !!S.sheet && S.boxesOk, done: Object.keys(S.bases).length === 5 },
+    5: { on: Object.keys(S.bases).length === 5, done: Object.values(S.report).flat().length === 15 },
+    6: { on: EXPRS.some((e) => S.parts[e]?.mouth_2), done: false },
+  };
+}
+function renderNav() {
+  const st = stepState();
+  $$('nav button').forEach((b) => {
+    const n = Number(b.dataset.step);
+    b.disabled = !st[n].on;
+    b.setAttribute('aria-current', n === S.step ? 'step' : 'false');
+    const dot = b.querySelector('.dot'); dot.classList.toggle('done', st[n].done); dot.textContent = st[n].done ? '✓' : n;
+  });
+}
+function go(n) {
+  if (!stepState()[n].on) return;
+  S.step = n;
+  $$('section').forEach((s) => s.classList.toggle('active', s.id === `s${n}`));
+  if (n === 2) { $('#editorImg').src = S.sheetURL; placeBoxes(); }
+  renderAll(); window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+$$('nav button').forEach((b) => { b.onclick = () => go(Number(b.dataset.step)); });
+function renderBusy() {
+  $$('.run').forEach((b) => { b.disabled = S.busy; });
+  $('#confirmSheet').disabled = S.picked < 0 || S.busy;
+  $('#modeDemo').disabled = $('#modeGemini').disabled = S.busy;
+}
+function renderAll() { renderNav(); renderSheet(); renderCons(); renderExpr(); renderParts(); renderPreview(); renderBusy(); renderCounter(); }
+
+/* ---------- 모드·키 ---------- */
+function setMode(m) {
+  if (S.mode === m) return;
+  if ((S.sheet || S.candidates.length) && !confirm('모드를 바꾸면 지금까지의 결과가 지워집니다. 계속할까요?')) return;
+  Object.assign(S, { mode: m, candidates: [], picked: -1, sheet: null, sheetData: null, sheetURL: '', boxesOk: false, cons: [], consOk: new Set(), bases: {}, drift: {}, parts: {}, report: {}, variants: {}, timing: {}, log: [], calls: 0, api: null });
+  S.boxes = structuredClone(DEFAULT_BOXES);
+  $('#modeDemo').setAttribute('aria-pressed', String(m === 'demo'));
+  $('#modeGemini').setAttribute('aria-pressed', String(m === 'gemini'));
+  $('#keyField').hidden = $('#modelField').hidden = m !== 'gemini';
+  clearMsg(); go(1);
+}
+$('#modeDemo').onclick = () => setMode('demo');
+$('#modeGemini').onclick = () => setMode('gemini');
+try {
+  const saved = localStorage.getItem('sseoltoon-gemini-key');
+  if (saved) { $('#keyInput').value = saved; $('#rememberKey').checked = true; }
+} catch { /* 저장소를 쓸 수 없는 환경 */ }
+function saveKey() {
+  try { if ($('#rememberKey').checked && S.key()) localStorage.setItem('sseoltoon-gemini-key', S.key()); else localStorage.removeItem('sseoltoon-gemini-key'); } catch { /* 무시 */ }
+}
+$('#rememberKey').onchange = saveKey; $('#keyInput').onchange = saveKey;
+window.addEventListener('beforeunload', (e) => { if (S.sheet || S.busy) { e.preventDefault(); e.returnValue = ''; } });
+
+go(1);
+</script>
+</body>
+</html>
