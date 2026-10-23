@@ -138,7 +138,8 @@ td select{min-height:32px;padding:4px 6px}
         <span class="small" id="parseNote"></span>
       </div>
       <div class="hint">
-        <b>형식</b> &nbsp; <code>이름: 대사</code> 등장인물 대사 · <code>(문장)</code> 나레이션 · <code>[장면: 장소]</code> 장소 바뀜<br>
+        <b>형식</b> &nbsp; <code>이름: 대사</code> 등장인물 대사 · <code>(문장)</code> 나레이션 · <code>[장면: 장소]</code> 장면 바뀜 · <code>이름[놀람]: 대사</code> 표정 지정 · 줄 끝 <code>{효과: 쿵, 흔들림, 클로즈업}</code><br>
+        ChatGPT 이미지 프롬프트(장면 1·2·3, <code>[대본]</code> 포함)를 통째로 붙여 넣어도 대본 부분만 읽어 장면별로 나눕니다.<br>
         대사 끝의 <code>!</code> <code>?!</code> <code>…</code> <code>ㅋㅋ</code> 같은 표현으로 표정이 자동으로 정해지고, 3단계에서 직접 바꿀 수 있습니다.
       </div>
     </section>
@@ -147,7 +148,11 @@ td select{min-height:32px;padding:4px 6px}
       <h2>2. 캐릭터·목소리</h2>
       <p class="lead">대본에서 찾은 등장인물입니다. 캐릭터 검증기에서 저장한 <b>.zip</b>을 넣으면 그 캐릭터로 바뀌고, 없으면 데모 캐릭터를 씁니다. 나레이션은 '나' 캐릭터 목소리로 읽습니다.</p>
       <div class="chars" id="chars"></div>
-      <h3 style="margin:26px 0 4px;font-size:17px">장소 배경</h3>
+      <h3 style="margin:26px 0 4px;font-size:17px">장면 그림 (ChatGPT 등에서 만든 그림)</h3>
+      <p class="small" style="margin:0">장면마다 완성된 그림 한 장을 넣으면 캐릭터 대신 그 그림이 화면 전체에 나오고, 음성·자막·카메라 효과가 얹힙니다. 여러 장을 한 번에 고르면 파일 이름 순서대로 장면 1, 2, 3…에 들어갑니다.</p>
+      <div class="row" style="margin-top:8px"><label class="btn" for="sceneMulti" style="display:inline-flex;align-items:center">장면 그림 한 번에 넣기</label><input type="file" id="sceneMulti" accept="image/*" multiple hidden></div>
+      <div class="chars" id="scenes"></div>
+      <h3 style="margin:26px 0 4px;font-size:17px">장소 배경 (장면 그림이 없을 때)</h3>
       <p class="small" style="margin:0">장소마다 배경 그림을 넣을 수 있습니다(가로 그림 권장). 넣지 않으면 기본 배경을 씁니다. 대사 컷에서는 인물이 잘 보이도록 흐리게 처리됩니다.</p>
       <div class="chars" id="places"></div>
       <div class="row" style="margin-top:18px"><button type="button" class="btn primary" id="toCuts">다음: 컷 확인</button></div>
@@ -222,7 +227,7 @@ const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 
 const S = {
   mode: 'demo', step: 1, busy: false, abort: false,
-  cuts: [], chars: {}, order: [], audio: null, timeline: [], total: 0, models: null, bgImages: {},
+  cuts: [], chars: {}, order: [], audio: null, timeline: [], total: 0, models: null, bgImages: {}, sceneImgs: {},
 };
 
 /* ---------- 공통 ---------- */
@@ -254,27 +259,57 @@ function detectEmotion(line) {
   return 'neutral';
 }
 function parseScript(text) {
-  const cuts = []; let place = '장소'; let newScene = true;
-  for (const raw of text.split('\n')) {
-    const line = raw.trim(); if (!line) continue;
+  const cuts = []; let place = '장소'; let newScene = true; let scene = 0; let started = false;
+  const rawLines = text.split('\n');
+  // GPT 이미지 프롬프트를 통째로 붙여 넣은 경우: [대본] 부분만 읽음
+  const promptMode = rawLines.some((l) => /^\s*\[대본\]\s*$/.test(l));
+  let inScript = !promptMode;
+  const next = () => { if (started) scene++; started = true; newScene = true; };
+  for (const raw of rawLines) {
+    let line = raw.trim().replace(/^\*\*|\*\*$/g, '').replace(/^#+\s*/, '').trim(); if (!line || /^```/.test(line)) continue;
     let m;
-    if ((m = line.match(/^\[(?:장면|장소)\s*[:：]\s*(.+?)\]$/))) { place = m[1].trim(); newScene = true; continue; }
-    if ((m = line.match(/^[(（](.+)[)）]$/))) { cuts.push({ kind: 'narr', speaker: '나레이션', text: m[1].trim(), place, newScene }); newScene = false; continue; }
-    if ((m = line.match(/^([^:：]{1,12})\s*[:：]\s*(.+)$/))) { cuts.push({ kind: 'line', speaker: m[1].trim(), text: m[2].trim(), place, newScene }); newScene = false; continue; }
-    cuts.push({ kind: 'narr', speaker: '나레이션', text: line, place, newScene }); newScene = false;
+    // "장면 1. 갑작스러운 방문" / "장면 2를 그려줘."
+    if ((m = line.match(/^장면\s*(\d+)\s*(?:[.:：]\s*(.*))?/)) && !line.startsWith('[')) { const N = Number(m[1]) - 1; if (!started || N !== scene) { scene = N; started = true; newScene = true; } if (m[2] && !/그려/.test(m[2])) place = m[2].replace(/\(.*\)$/, '').trim() || place; inScript = !promptMode; continue; }
+    if (/^\[대본\]$/.test(line)) { inScript = true; continue; }
+    if ((m = line.match(/^\[(?:장면|장소)\s*\d*\s*[:：]\s*(.+?)\]$/))) {
+      const parts = m[1].split('|').map((x) => x.trim()); place = parts[0]; next();
+      cuts.sceneMeta = cuts.sceneMeta || {}; const meta = {};
+      for (const pt of parts.slice(1)) { const kv = pt.match(/^(그림|배경|음악)\s*[:：]\s*(.+)$/); if (kv) meta[kv[1]] = kv[2].trim(); }
+      cuts.sceneMeta[scene] = meta; inScript = true; continue;
+    }
+    if (/^\[[^\]]{1,8}\]/.test(line)) { if (promptMode) inScript = false; continue; } // [구도] [표정] 등 그림 지시는 건너뜀
+    if (!inScript) continue;
+    if (!started) { started = true; }
+    // {효과: 쿵, 흔들림 | 구도: 클로즈업} 태그
+    const fx = []; line = line.replace(/\{([^}]*)\}/g, (_, body) => { body.split('|').forEach((pt) => { const kv = pt.split(/[:：]/); (kv[1] || kv[0]).split(',').forEach((v) => fx.push(v.trim())); }); return ''; }).trim();
+    const base = { place, newScene, scene, fx };
+    if ((m = line.match(/^[(（]\s*나레이션\s*[)）]\s*(.+)$/))) { cuts.push({ kind: 'narr', speaker: '나레이션', text: m[1].trim(), ...base }); newScene = false; continue; }
+    if ((m = line.match(/^[(（](.+)[)）]$/))) { cuts.push({ kind: 'narr', speaker: '나레이션', text: m[1].trim(), ...base }); newScene = false; continue; }
+    if ((m = line.match(/^([^:：\[\]]{1,12}?)\s*(?:\[([^\]]+)\])?\s*[:：]\s*(.+)$/))) { cuts.push({ kind: 'line', speaker: m[1].trim(), exprTag: m[2], text: m[3].trim(), ...base }); newScene = false; continue; }
+    cuts.push({ kind: 'narr', speaker: '나레이션', text: line, ...base }); newScene = false;
   }
   // 표정·구도 자동 지정
   let recent = [];
   for (const c of cuts) {
     if (c.newScene) recent = [];
-    if (c.kind === 'narr') { c.expr = 'neutral'; c.layout = 'narr'; c.shake = false; continue; }
-    c.expr = detectEmotion(c.text);
+    const fx = c.fx || [];
+    if (c.kind === 'narr') { c.expr = 'neutral'; c.layout = 'narr'; c.shake = fx.some((v) => /흔들|쿵/.test(v)); c.boom = fx.some((v) => /쿵/.test(v)); continue; }
+    c.expr = EXPR_TAG[c.exprTag] || detectEmotion(c.text);
     c.shake = c.expr === 'surprised';
     recent = [c.speaker, ...recent.filter((s) => s !== c.speaker)].slice(0, 2);
     c.partner = recent[1] || null;
     c.layout = c.shake ? 'close' : (c.partner ? 'two' : 'one');
+    if (fx.some((v) => /흔들|쿵/.test(v))) c.shake = true;
+    if (fx.some((v) => /클로즈|집중선/.test(v))) c.layout = 'close';
+    c.boom = fx.some((v) => /쿵/.test(v));
   }
   return cuts;
+}
+const EXPR_TAG = { 기본: 'neutral', 웃음: 'happy', 기쁨: 'happy', 화남: 'angry', 분노: 'angry', 슬픔: 'sad', 놀람: 'surprised', 충격: 'surprised' };
+function sceneList() {
+  const out = [];
+  for (const c of S.cuts) if (!out.some((x) => x.n === c.scene)) out.push({ n: c.scene, place: c.place, first: c.text });
+  return out;
 }
 $('#parseBtn').onclick = () => {
   const cuts = parseScript($('#script').value);
@@ -286,9 +321,10 @@ $('#parseBtn').onclick = () => {
   speakers.forEach((name, i) => {
     S.chars[name] = oldChars[name] || makeDemoChar(name, i);
   });
+  S.sceneMeta = cuts.sceneMeta || {};
   S.order = speakers; S.bgImages = Object.fromEntries(Object.entries(S.bgImages).filter(([k]) => cuts.some((c) => c.place === k)));
   $('#parseNote').textContent = `컷 ${cuts.length}개 · 등장인물 ${speakers.length}명`;
-  clearMsg(); renderChars(); renderPlaces(); go(2);
+  clearMsg(); renderChars(); renderScenes(); renderPlaces(); go(2);
 };
 
 /* ---------- 2. 캐릭터 ---------- */
@@ -405,6 +441,31 @@ function renderPlaces() {
     box.append(d); paint();
   });
 }
+function renderScenes() {
+  const box = $('#scenes'); box.replaceChildren();
+  sceneList().forEach(({ n, place, first }) => {
+    const d = document.createElement('div'); d.className = 'char place';
+    d.innerHTML = `<h3></h3><p class="small" style="margin:0 0 6px"></p><canvas width="320" height="180"></canvas><label class="small" for="sc${n}">그림 넣기</label><input type="file" id="sc${n}" accept="image/*">`;
+    d.querySelector('h3').textContent = `장면 ${n + 1} · ${place}`;
+    d.querySelector('p').textContent = `“${first.slice(0, 22)}${first.length > 22 ? '…' : ''}”`;
+    const cv = d.querySelector('canvas'), g = cv.getContext('2d'), img = S.sceneImgs[n];
+    if (img) { const sc = Math.max(320 / img.width, 180 / img.height); g.drawImage(img, (320 - img.width * sc) / 2, (180 - img.height * sc) / 2, img.width * sc, img.height * sc); }
+    else { g.fillStyle = '#EEE'; g.fillRect(0, 0, 320, 180); g.fillStyle = '#888'; g.font = '15px sans-serif'; g.textAlign = 'center'; g.fillText('그림 없음 → 캐릭터 방식', 160, 95); }
+    d.querySelector('input').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; S.sceneImgs[n] = await loadImg(URL.createObjectURL(f)); renderScenes(); };
+    if (img) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = '빼기'; b.onclick = () => { delete S.sceneImgs[n]; renderScenes(); }; d.append(b); }
+    box.append(d);
+  });
+}
+$('#sceneMulti').onchange = async (e) => {
+  const files = [...e.target.files].sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true })); e.target.value = '';
+  const scenes = sceneList(), meta = S.sceneMeta || {};
+  const used = new Set();
+  // [장면: … | 그림: 파일이름] 으로 지정된 것부터
+  for (const { n } of scenes) { const want = meta[n]?.그림; const f = want && files.find((x) => x.name === want || x.name.startsWith(want)); if (f) { S.sceneImgs[n] = await loadImg(URL.createObjectURL(f)); used.add(f); } }
+  const rest = files.filter((f) => !used.has(f)); let k = 0;
+  for (const { n } of scenes) { if (meta[n]?.그림 && S.sceneImgs[n]) continue; if (k >= rest.length) break; S.sceneImgs[n] = await loadImg(URL.createObjectURL(rest[k++])); }
+  renderScenes();
+};
 function drawBackgroundTo(g, place, w, h) {
   const full = newCanvas(VW, VH), keep = sgRef.ctx; sgRef.ctx = full.getContext('2d');
   drawBackground(place, false); sgRef.ctx = keep;
@@ -443,9 +504,9 @@ function renderCuts() {
 function moveCut(i, d) { const j = i + d; [S.cuts[i], S.cuts[j]] = [S.cuts[j], S.cuts[i]]; relink(); renderCuts(); }
 /** 순서가 바뀌면 장면 시작 표시와 대화 상대를 다시 계산 */
 function relink() {
-  let prevPlace = null, recent = [];
+  let prevPlace = null, prevScene = null, recent = [];
   for (const c of S.cuts) {
-    c.newScene = c.place !== prevPlace || c.forceScene === true; prevPlace = c.place;
+    c.newScene = c.place !== prevPlace || c.scene !== prevScene || c.forceScene === true; prevPlace = c.place; prevScene = c.scene;
     if (c.newScene) recent = [];
     if (c.kind !== 'line') continue;
     recent = [c.speaker, ...recent.filter((x) => x !== c.speaker)].slice(0, 2);
@@ -749,7 +810,15 @@ function drawAt(t) {
   let sx = 0, sy = 0;
   if (c.shake && local < 0.35) { sx = (Math.random() - 0.5) * 18; sy = (Math.random() - 0.5) * 18; }
   sg.translate(VW / 2 + sx, VH / 2 + sy); sg.scale(zoom, zoom); sg.translate(-VW / 2, -VH / 2);
-  const narrOnly = c.kind === 'narr';
+  const narrOnly = c.kind === 'narr', simg = S.sceneImgs[c.scene];
+  if (simg) {
+    // 장면 그림: 컷마다 살짝 다른 위치로 천천히 움직임, 클로즈업 지시는 더 크게
+    const idx = S.timeline.indexOf(seg), dir = idx % 2 ? 1 : -1, p = local / dur;
+    const z = (c.layout === 'close' && c.kind === 'line' ? 1.18 : 1.03) + 0.05 * p;
+    const sc = Math.max(VW / simg.width, VH / simg.height) * z, w = simg.width * sc, h = simg.height * sc;
+    const px = dir * (w - VW) * 0.3 * (p - 0.5);
+    sg.drawImage(simg, (VW - w) / 2 + px, (VH - h) / 2 - (c.layout === 'close' ? (h - VH) * 0.25 : 0), w, h);
+  } else {
   drawBackground(c.place, !narrOnly || !S.chars['나']);
   if (c.kind === 'narr') {
     const me = S.chars['나'];
@@ -768,7 +837,10 @@ function drawAt(t) {
       drawChar(ch, c.expr, blinkAt(t, seed), speaking ? mouth : 0, VW / 2, 1.05, false, false);
     }
   }
+  }
   sg.restore();
+  if (c.boom && local < 0.25) { sg.save(); sg.fillStyle = `rgba(255,255,255,${0.6 * (1 - local / 0.25)})`; sg.fillRect(0, 0, VW, VH); sg.restore(); }
+  if (c.newScene && local < 0.5) { sg.save(); sg.fillStyle = `rgba(0,0,0,${1 - local / 0.5})`; sg.fillRect(0, 0, VW, VH); sg.restore(); }
   // 장소 캡션 (장면 첫 컷 1.5초)
   if (c.newScene && local < 1.8) {
     sg.save(); sg.globalAlpha = Math.min(1, (1.8 - local) * 2);
@@ -869,8 +941,9 @@ $('#saveProj').onclick = () => run(async () => {
   }
   const data = {
     app: 'sseoltoon-maker', v: 1, savedAt: new Date().toISOString(), script: $('#script').value, order: S.order, chars,
-    cuts: S.cuts.map((c) => ({ kind: c.kind, speaker: c.speaker, text: c.text, place: c.place, newScene: c.newScene, expr: c.expr, layout: c.layout, shake: c.shake, partner: c.partner, bufferVoice: c.bufferVoice, audio: c.buffer ? bufferToWavB64(c.buffer) : null })),
+    cuts: S.cuts.map((c) => ({ kind: c.kind, speaker: c.speaker, text: c.text, place: c.place, newScene: c.newScene, expr: c.expr, layout: c.layout, shake: c.shake, partner: c.partner, bufferVoice: c.bufferVoice, scene: c.scene, fx: c.fx, boom: c.boom, audio: c.buffer ? bufferToWavB64(c.buffer) : null })),
     backgrounds: Object.fromEntries(Object.entries(S.bgImages).map(([k, im]) => [k, imgToDataURL(im, 'image/jpeg')])),
+    scenes: Object.fromEntries(Object.entries(S.sceneImgs).map(([k, im]) => [k, imgToDataURL(im, 'image/jpeg')])),
     sound: { sfx: $('#sfxOn').checked, bgm: $('#bgmSel').value, vol: $('#bgmVol').value },
   };
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
@@ -893,10 +966,11 @@ $('#loadProj').onchange = (e) => run(async () => {
   S.cuts = [];
   for (const c of data.cuts) { const { audio, ...rest } = c; const cut = { ...rest }; if (audio) cut.buffer = await wavB64ToBuffer(audio); S.cuts.push(cut); }
   S.bgImages = {}; for (const [k, url] of Object.entries(data.backgrounds || {})) S.bgImages[k] = await loadImg(url);
+  S.sceneImgs = {}; for (const [k, url] of Object.entries(data.scenes || {})) S.sceneImgs[k] = await loadImg(url);
   if (data.sound) { $('#sfxOn').checked = data.sound.sfx; $('#bgmSel').value = data.sound.bgm; $('#bgmVol').value = data.sound.vol; }
   S.audio = null; P.offset = 0;
   $('#parseNote').textContent = `컷 ${S.cuts.length}개 · 등장인물 ${S.order.length}명 (불러옴)`;
-  renderChars(); renderPlaces();
+  renderChars(); renderScenes(); renderPlaces();
   const done = S.cuts.every((c) => c.buffer);
   if (done) await buildTimeline();
   showMsg(`작업을 불러왔습니다. 음성 ${S.cuts.filter((c) => c.buffer).length}/${S.cuts.length}컷 완료 상태입니다.`, 'info');
