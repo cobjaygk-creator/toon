@@ -182,6 +182,7 @@ td select{min-height:32px;padding:4px 6px}
 </div>
 
 <script>
+(() => {
 'use strict';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -743,6 +744,7 @@ $('#modeGemini').onclick = () => setMode('gemini');
 try { const k = localStorage.getItem('sseoltoon-gemini-key'); if (k) $('#keyInput').value = k; } catch { /* 저장소 사용 불가 */ }
 $('#keyInput').onchange = () => { try { localStorage.setItem('sseoltoon-gemini-key', key()); } catch { /* 무시 */ } };
 go(1);
+})();
 </script>
 </body>
 </html>
