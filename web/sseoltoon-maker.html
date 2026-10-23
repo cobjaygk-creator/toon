@@ -444,7 +444,7 @@ async function geminiVoice(text, voice, styleHint) {
   const { tts } = await discoverModels();
   if (!tts) throw new Error('이 키로 쓸 수 있는 Gemini 음성(TTS) 모델이 없습니다.');
   const body = {
-    contents: [{ role: 'user', parts: [{ text: `${styleHint} 한국어로 자연스럽게 읽어줘: ${text}` }] }],
+    contents: [{ role: 'user', parts: [{ text }] }],
     generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
   };
   for (let attempt = 1; ; attempt++) {
@@ -465,7 +465,15 @@ async function geminiVoice(text, voice, styleHint) {
     }
     const t = await r.text();
     if (r.status === 429 && /limit: 0/.test(t)) throw new Error('무료 등급에서 이 음성 모델을 쓸 수 없습니다. Google AI Studio에서 결제를 켜 주세요.');
-    if ((r.status === 429 || r.status >= 500) && attempt < 4) { await new Promise((ok) => setTimeout(ok, attempt * 5000)); continue; }
+    if ((r.status === 429 || r.status >= 500) && attempt < 9) {
+      const wait = Math.min(90, Number(t.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/)?.[1] || 20 * attempt)) + 2;
+      for (let left = Math.ceil(wait); left > 0; left--) {
+        if (S.abort) throw new Cancelled();
+        $('#statusText').textContent = `무료 한도에 걸려 ${left}초 기다린 뒤 이어서 만듭니다…`;
+        await new Promise((ok) => setTimeout(ok, 1000));
+      }
+      continue;
+    }
     throw new Error(`음성 생성 실패 (${r.status}): ${t.slice(0, 200)}`);
   }
 }
@@ -484,7 +492,9 @@ function renderVoice() {
     }
     tb.append(tr);
   });
-  $('#ttsCost').textContent = S.mode === 'demo' ? '데모: 비용 없음' : `Gemini 음성 ${S.cuts.length}회`;
+  const left = S.cuts.filter((c) => !c.buffer).length;
+  $('#ttsCost').textContent = S.mode === 'demo' ? '데모: 비용 없음' : `Gemini 음성 ${left}회 남음 · 무료 등급은 1분 한도에 걸리면 자동으로 기다렸다 이어갑니다`;
+  $('#ttsBtn').textContent = left && left < S.cuts.length ? '이어서 만들기' : '음성 만들기';
 }
 $('#ttsBtn').onclick = () => run(async () => {
   if (S.mode === 'gemini' && !key()) throw new Error("맨 위 'API 키' 칸에 키를 먼저 입력해 주세요.");
@@ -492,7 +502,9 @@ $('#ttsBtn').onclick = () => run(async () => {
   for (let i = 0; i < S.cuts.length; i++) {
     if (S.abort) throw new Cancelled();
     const c = S.cuts[i];
+    if (c.buffer && c.bufferVoice === voiceOf(c)) continue;
     setStatus(`${i + 1}번 컷 음성: ${c.text.slice(0, 18)}`, i, S.cuts.length);
+    c.bufferVoice = voiceOf(c);
     c.buffer = S.mode === 'demo' ? await demoVoice(c.text, VOICES.findIndex((v) => v[0] === voiceOf(c)) + 1) : await geminiVoice(c.text, voiceOf(c), c.kind === 'narr' ? '1인칭 나레이션처럼 차분하게' : STYLE[c.expr]);
     renderVoice();
   }
