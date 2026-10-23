@@ -58,7 +58,11 @@ select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
 th{font-size:13px;color:var(--ink2);font-weight:600;white-space:nowrap}
-td.line{min-width:240px}
+td.line{min-width:260px}
+td.line input{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:#fff}
+.mini{border:1px solid var(--line);background:#fff;border-radius:6px;min-width:32px;min-height:32px;cursor:pointer}
+.mini:disabled{opacity:.35;cursor:default}
+.place canvas{aspect-ratio:16/9}
 td select{min-height:32px;padding:4px 6px}
 .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;background:#EFEEEA;color:var(--ink2);white-space:nowrap}
 .status{display:none;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border-radius:var(--radius);background:var(--accent-soft)}
@@ -92,6 +96,12 @@ td select{min-height:32px;padding:4px 6px}
     <input id="keyInput" type="password" autocomplete="off" placeholder="Google AI Studio API 키">
   </div>
   <span class="small" id="modelInfo"></span>
+  <div class="row" style="margin-left:auto">
+    <button type="button" class="btn" id="saveProj">작업 저장</button>
+    <label class="btn" for="loadProj" style="display:inline-flex;align-items:center">불러오기</label>
+    <input type="file" id="loadProj" accept=".json" hidden>
+    <a id="projDl" hidden></a>
+  </div>
 </header>
 
 <div class="layout">
@@ -137,13 +147,16 @@ td select{min-height:32px;padding:4px 6px}
       <h2>2. 캐릭터·목소리</h2>
       <p class="lead">대본에서 찾은 등장인물입니다. 캐릭터 검증기에서 저장한 <b>.zip</b>을 넣으면 그 캐릭터로 바뀌고, 없으면 데모 캐릭터를 씁니다. 나레이션은 '나' 캐릭터 목소리로 읽습니다.</p>
       <div class="chars" id="chars"></div>
+      <h3 style="margin:26px 0 4px;font-size:17px">장소 배경</h3>
+      <p class="small" style="margin:0">장소마다 배경 그림을 넣을 수 있습니다(가로 그림 권장). 넣지 않으면 기본 배경을 씁니다. 대사 컷에서는 인물이 잘 보이도록 흐리게 처리됩니다.</p>
+      <div class="chars" id="places"></div>
       <div class="row" style="margin-top:18px"><button type="button" class="btn primary" id="toCuts">다음: 컷 확인</button></div>
     </section>
 
     <section id="s3">
       <h2>3. 컷 확인</h2>
       <p class="lead">컷마다 표정과 구도를 확인하세요. 구도는 장면 구도 템플릿 기준입니다(2인 대화, 원샷, 클로즈업, 나레이션).</p>
-      <div class="tablebox"><table id="cutTable"><thead><tr><th>#</th><th>장소</th><th>화자</th><th>대사</th><th>표정</th><th>구도</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablebox"><table id="cutTable"><thead><tr><th>#</th><th>장소</th><th>화자</th><th>대사 (고칠 수 있음)</th><th>표정</th><th>구도</th><th>순서</th></tr></thead><tbody></tbody></table></div>
       <div class="row" style="margin-top:18px"><button type="button" class="btn primary" id="toVoice">다음: 음성 만들기</button><span class="small" id="cutSummary"></span></div>
     </section>
 
@@ -153,6 +166,13 @@ td select{min-height:32px;padding:4px 6px}
       <div class="row">
         <button type="button" class="btn primary run" id="ttsBtn">음성 만들기</button>
         <span class="small" id="ttsCost"></span>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <label class="check small" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="sfxOn" checked> 효과음 (장면 전환·충격 컷)</label>
+        <label class="small" for="bgmSel">배경음악</label>
+        <select id="bgmSel"><option value="none">없음</option><option value="calm" selected>잔잔하게</option><option value="tense">긴장감</option></select>
+        <label class="small" for="bgmVol">음악 크기</label>
+        <input type="range" id="bgmVol" min="0" max="100" value="35">
       </div>
       <div class="tablebox"><table id="voiceTable"><thead><tr><th>#</th><th>화자</th><th>대사</th><th>길이</th><th></th></tr></thead><tbody></tbody></table></div>
     </section>
@@ -165,7 +185,7 @@ td select{min-height:32px;padding:4px 6px}
         <div class="row">
           <button type="button" class="btn primary" id="playBtn">재생</button>
           <button type="button" class="btn" id="stopBtn">처음으로</button>
-          <button type="button" class="btn run" id="recBtn">영상 저장 (WebM)</button>
+          <button type="button" class="btn run" id="recBtn">영상 저장</button>
           <span class="small" id="timeInfo">0:00 / 0:00</span>
           <a id="dl" hidden>다운로드</a>
         </div>
@@ -202,7 +222,7 @@ const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 
 const S = {
   mode: 'demo', step: 1, busy: false, abort: false,
-  cuts: [], chars: {}, order: [], audio: null, timeline: [], total: 0, models: null,
+  cuts: [], chars: {}, order: [], audio: null, timeline: [], total: 0, models: null, bgImages: {},
 };
 
 /* ---------- 공통 ---------- */
@@ -266,9 +286,9 @@ $('#parseBtn').onclick = () => {
   speakers.forEach((name, i) => {
     S.chars[name] = oldChars[name] || makeDemoChar(name, i);
   });
-  S.order = speakers;
+  S.order = speakers; S.bgImages = Object.fromEntries(Object.entries(S.bgImages).filter(([k]) => cuts.some((c) => c.place === k)));
   $('#parseNote').textContent = `컷 ${cuts.length}개 · 등장인물 ${speakers.length}명`;
-  clearMsg(); renderChars(); go(2);
+  clearMsg(); renderChars(); renderPlaces(); go(2);
 };
 
 /* ---------- 2. 캐릭터 ---------- */
@@ -368,6 +388,28 @@ function renderChars() {
     drawCharCard(ch, d.querySelector('canvas'));
   }
 }
+function renderPlaces() {
+  const box = $('#places'); box.replaceChildren();
+  const places = [...new Set(S.cuts.map((c) => c.place))];
+  places.forEach((pl, i) => {
+    const d = document.createElement('div'); d.className = 'char place';
+    d.innerHTML = `<h3></h3><canvas width="320" height="180" aria-label="${pl} 배경 미리보기"></canvas><label class="small" for="bg${i}">배경 그림 넣기</label><input type="file" id="bg${i}" accept="image/*">`;
+    d.querySelector('h3').textContent = pl;
+    const cv = d.querySelector('canvas');
+    const paint = () => { const g = cv.getContext('2d'); const old = { sg }; drawBackgroundTo(g, pl, cv.width, cv.height); };
+    d.querySelector('input').onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      const url = URL.createObjectURL(f); S.bgImages[pl] = await loadImg(url); paint();
+    };
+    if (S.bgImages[pl]) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = '기본 배경으로'; b.onclick = () => { delete S.bgImages[pl]; renderPlaces(); }; d.append(b); }
+    box.append(d); paint();
+  });
+}
+function drawBackgroundTo(g, place, w, h) {
+  const full = newCanvas(VW, VH), keep = sgRef.ctx; sgRef.ctx = full.getContext('2d');
+  drawBackground(place, false); sgRef.ctx = keep;
+  g.drawImage(full, 0, 0, w, h);
+}
 $('#toCuts').onclick = () => { renderCuts(); go(3); };
 
 /* ---------- 3. 컷 ---------- */
@@ -375,8 +417,13 @@ function renderCuts() {
   const tb = $('#cutTable tbody'); tb.replaceChildren();
   S.cuts.forEach((c, i) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${i + 1}</td><td><span class="tag">${c.place}</span></td><td>${c.kind === 'narr' ? '<span class="small">나레이션</span>' : `<b>${c.speaker}</b>`}</td><td class="line"></td><td></td><td></td>`;
-    tr.querySelector('.line').textContent = c.text;
+    tr.innerHTML = `<td>${i + 1}</td><td><span class="tag">${c.place}</span></td><td>${c.kind === 'narr' ? '<span class="small">나레이션</span>' : `<b>${c.speaker}</b>`}</td><td class="line"><input aria-label="${i + 1}번 컷 대사"></td><td></td><td></td><td style="white-space:nowrap"></td>`;
+    const inp = tr.querySelector('.line input'); inp.value = c.text;
+    inp.onchange = () => { const v = inp.value.trim(); if (!v || v === c.text) { inp.value = c.text; return; } c.text = v; delete c.buffer; S.audio = null; renderNav(); };
+    const mk = (label, aria, fn, dis) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'mini'; b.textContent = label; b.setAttribute('aria-label', aria); b.disabled = !!dis; b.onclick = fn; tr.lastElementChild.append(b); };
+    mk('↑', `${i + 1}번 컷 위로`, () => moveCut(i, -1), i === 0);
+    mk('↓', `${i + 1}번 컷 아래로`, () => moveCut(i, 1), i === S.cuts.length - 1);
+    mk('✕', `${i + 1}번 컷 삭제`, () => { S.cuts.splice(i, 1); relink(); renderCuts(); }, S.cuts.length <= 1);
     if (c.kind === 'line') {
       const se = document.createElement('select'); se.setAttribute('aria-label', `${i + 1}번 컷 표정`);
       se.innerHTML = EXPRS.map((e) => `<option value="${e}" ${e === c.expr ? 'selected' : ''}>${EXPR_KO[e]}</option>`).join('');
@@ -392,6 +439,20 @@ function renderCuts() {
   });
   const lines = S.cuts.filter((c) => c.kind === 'line').length;
   $('#cutSummary').textContent = `대사 ${lines}컷 · 나레이션 ${S.cuts.length - lines}컷`;
+}
+function moveCut(i, d) { const j = i + d; [S.cuts[i], S.cuts[j]] = [S.cuts[j], S.cuts[i]]; relink(); renderCuts(); }
+/** 순서가 바뀌면 장면 시작 표시와 대화 상대를 다시 계산 */
+function relink() {
+  let prevPlace = null, recent = [];
+  for (const c of S.cuts) {
+    c.newScene = c.place !== prevPlace || c.forceScene === true; prevPlace = c.place;
+    if (c.newScene) recent = [];
+    if (c.kind !== 'line') continue;
+    recent = [c.speaker, ...recent.filter((x) => x !== c.speaker)].slice(0, 2);
+    c.partner = recent[1] || null;
+    if (c.layout === 'two' && !c.partner) c.layout = 'one';
+  }
+  S.audio = null; renderNav();
 }
 $('#toVoice').onclick = () => { renderVoice(); go(4); };
 
@@ -494,7 +555,10 @@ function renderVoice() {
     if (c.buffer) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = '듣기';
       b.onclick = () => { const s = ac().createBufferSource(); s.buffer = c.buffer; s.connect(ac().destination); s.start(); };
-      tr.lastElementChild.append(b);
+      const r = document.createElement('button'); r.type = 'button'; r.className = 'btn run'; r.textContent = '다시'; r.style.marginLeft = '6px';
+      r.setAttribute('aria-label', `${i + 1}번 컷 음성 다시 만들기`);
+      r.onclick = () => { delete c.buffer; S.audio = null; renderVoice(); renderNav(); $('#ttsBtn').click(); };
+      tr.lastElementChild.append(b, r);
     }
     tb.append(tr);
   });
@@ -514,30 +578,88 @@ $('#ttsBtn').onclick = () => run(async () => {
     c.buffer = S.mode === 'demo' ? await demoVoice(c.text, VOICES.findIndex((v) => v[0] === voiceOf(c)) + 1) : await geminiVoice(c.text, voiceOf(c), c.kind === 'narr' ? '1인칭 나레이션처럼 차분하게' : STYLE[c.expr]);
     renderVoice();
   }
-  buildTimeline();
+  await buildTimeline();
   showMsg(`음성 ${S.cuts.length}개 완료 · 전체 ${fmt(S.total)}. 5단계에서 재생해 보세요.`, 'info');
   renderNav(); go(5);
 });
 
 /* ---------- 타임라인·입 모양 ---------- */
-function buildTimeline() {
-  const pad = 0.35; let t = 0;
-  S.timeline = S.cuts.map((c, i) => { const s = t; const d = c.buffer.duration + pad + (c.newScene && i ? 0.5 : 0); t += d; return { cut: c, start: s, end: t, voiceStart: s + (c.newScene && i ? 0.5 : 0) }; });
-  S.total = t;
-  const rate = S.cuts[0].buffer.sampleRate;
-  const mix = ac().createBuffer(1, Math.ceil(t * rate) + rate, rate), out = mix.getChannelData(0);
+async function buildTimeline() {
+  const pad = 0.35; let t = 0.3;
+  S.timeline = S.cuts.map((c, i) => { const s = t; const lead = c.newScene && i ? 0.6 : 0; const d = c.buffer.duration + pad + lead; t += d; return { cut: c, start: s, end: t, voiceStart: s + lead }; });
+  S.timeline[0].start = 0;
+  S.total = t + 0.4;
+  S.timeline[S.timeline.length - 1].end = S.total;
+  const rate = 48000, len = Math.ceil((S.total + 0.2) * rate);
+  const off = new OfflineAudioContext(1, len, rate);
+  const voiceBus = off.createGain(); voiceBus.connect(off.destination);
+  for (const seg of S.timeline) { const src = off.createBufferSource(); src.buffer = seg.cut.buffer; src.connect(voiceBus); src.start(seg.voiceStart); }
+  if ($('#sfxOn').checked) addSfx(off);
+  addBgm(off, $('#bgmSel').value, Number($('#bgmVol').value) / 100);
+  S.audio = await off.startRendering();
+  // 입 모양: 컷 음성만 보고 계산 (음악·효과음 제외), 컷마다 크기를 맞춤
+  const env = new Uint8Array(Math.ceil(S.total * FPS) + 2);
   for (const seg of S.timeline) {
-    const src = seg.cut.buffer.sampleRate === rate ? seg.cut.buffer.getChannelData(0) : resample(seg.cut.buffer, rate);
-    out.set(src.subarray(0, Math.min(src.length, out.length - Math.floor(seg.voiceStart * rate))), Math.floor(seg.voiceStart * rate));
+    const d = seg.cut.buffer.getChannelData(0), r = seg.cut.buffer.sampleRate, step = Math.floor(r / FPS), vals = [];
+    for (let i = 0; i < d.length; i += step) { let q = 0; for (let j = i; j < i + step && j < d.length; j++) q += d[j] * d[j]; vals.push(Math.sqrt(q / step)); }
+    const mx = Math.max(1e-6, ...vals), f0 = Math.round(seg.voiceStart * FPS);
+    vals.forEach((v, k) => { const n = v / mx; env[f0 + k] = n < 0.12 ? 0 : n < 0.45 ? 1 : 2; });
   }
-  S.audio = mix;
-  // 1/30초마다 소리 크기 → 입 모양 0/1/2
-  const step = Math.floor(rate / FPS), env = [];
-  let max = 1e-6;
-  for (let i = 0; i < out.length; i += step) { let s = 0; for (let j = i; j < i + step && j < out.length; j++) s += out[j] * out[j]; const v = Math.sqrt(s / step); env.push(v); if (v > max) max = v; }
-  S.mouthEnv = env.map((v) => { const n = v / max; return n < 0.12 ? 0 : n < 0.45 ? 1 : 2; });
+  S.mouthEnv = env;
   renderTimelineBar();
 }
+function noiseBuf(off, sec) { const b = off.createBuffer(1, Math.ceil(off.sampleRate * sec), off.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; }
+function addSfx(off) {
+  S.timeline.forEach((seg, i) => {
+    if (seg.cut.newScene && i) { // 장면 전환: 휙
+      const n = off.createBufferSource(); n.buffer = noiseBuf(off, 0.6);
+      const bp = off.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2;
+      bp.frequency.setValueAtTime(300, seg.start); bp.frequency.exponentialRampToValueAtTime(2500, seg.start + 0.5);
+      const g = off.createGain(); g.gain.setValueAtTime(0, seg.start); g.gain.linearRampToValueAtTime(0.22, seg.start + 0.2); g.gain.linearRampToValueAtTime(0, seg.start + 0.55);
+      n.connect(bp).connect(g).connect(off.destination); n.start(seg.start);
+    }
+    if (seg.cut.shake) { // 충격 컷: 쿵
+      const t0 = Math.max(0, seg.voiceStart - 0.08);
+      const o = off.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(120, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + 0.45);
+      const g = off.createGain(); g.gain.setValueAtTime(0.9, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
+      o.connect(g).connect(off.destination); o.start(t0); o.stop(t0 + 0.65);
+      const n = off.createBufferSource(); n.buffer = noiseBuf(off, 0.15); const hp = off.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2000;
+      const g2 = off.createGain(); g2.gain.setValueAtTime(0.25, t0); g2.gain.exponentialRampToValueAtTime(0.001, t0 + 0.12);
+      n.connect(hp).connect(g2).connect(off.destination); n.start(t0);
+    }
+  });
+}
+function addBgm(off, kind, vol) {
+  if (kind === 'none' || vol <= 0) return;
+  const T = S.total, master = off.createGain();
+  master.gain.setValueAtTime(0, 0); master.gain.linearRampToValueAtTime(vol * 0.12, 1.5);
+  master.gain.setValueAtTime(vol * 0.12, Math.max(1.6, T - 1.5)); master.gain.linearRampToValueAtTime(0, T);
+  master.connect(off.destination);
+  if (kind === 'calm') {
+    const chords = [[261.6, 329.6, 392.0, 493.9], [220.0, 261.6, 329.6, 392.0], [174.6, 220.0, 261.6, 329.6], [196.0, 246.9, 293.7, 392.0]];
+    for (let t = 0, k = 0; t < T; t += 4, k++) {
+      for (const f of chords[k % 4]) {
+        const o = off.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+        const g = off.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25, t + 1); g.gain.linearRampToValueAtTime(0.18, t + 3); g.gain.linearRampToValueAtTime(0, t + 4.2);
+        o.connect(g).connect(master); o.start(t); o.stop(t + 4.3);
+      }
+    }
+  } else {
+    for (const f of [55, 82.4]) {
+      const o = off.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+      const lp = off.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 260;
+      const g = off.createGain(); g.gain.value = 0.35;
+      const lfo = off.createOscillator(); lfo.frequency.value = 0.5; const lg = off.createGain(); lg.gain.value = 0.2; lfo.connect(lg).connect(g.gain);
+      o.connect(lp).connect(g).connect(master); o.start(0); o.stop(T); lfo.start(0); lfo.stop(T);
+    }
+    for (let t = 2; t < T; t += 2) { // 심장 박동 같은 저음
+      const o = off.createOscillator(); o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(40, t + 0.25);
+      const g = off.createGain(); g.gain.setValueAtTime(0.8, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      o.connect(g).connect(master); o.start(t); o.stop(t + 0.32);
+    }
+  }
+}
+['sfxOn', 'bgmSel', 'bgmVol'].forEach((id) => { $('#' + id).addEventListener('change', async () => { if (S.audio && S.cuts.every((c) => c.buffer)) { stopPlay(); await buildTimeline(); drawAt(Math.min(P.offset, S.total - 0.01)); } }); });
 function resample(buf, rate) {
   const src = buf.getChannelData(0), ratio = buf.sampleRate / rate, out = new Float32Array(Math.floor(src.length / ratio));
   for (let i = 0; i < out.length; i++) out[i] = src[Math.floor(i * ratio)] || 0;
@@ -553,9 +675,18 @@ function renderTimelineBar() {
 }
 
 /* ---------- 5. 그리기 ---------- */
-const stage = $('#stage'), sg = stage.getContext('2d');
+const stage = $('#stage');
+const sgRef = { ctx: stage.getContext('2d') };
+const sgProxy = new Proxy({}, { get: (_, k) => { const v = sgRef.ctx[k]; return typeof v === 'function' ? v.bind(sgRef.ctx) : v; }, set: (_, k, v) => { sgRef.ctx[k] = v; return true; } });
+const sg = sgProxy;
 function hashStr(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h; }
 function drawBackground(place, blur) {
+  const img = S.bgImages[place];
+  if (img) {
+    sg.save(); if (blur) sg.filter = 'blur(6px) brightness(0.95)';
+    const sc = Math.max((VW + 40) / img.width, (VH + 40) / img.height), w = img.width * sc, h2 = img.height * sc;
+    sg.drawImage(img, (VW - w) / 2, (VH - h2) / 2, w, h2); sg.restore(); return;
+  }
   const h = hashStr(place), hue = h % 360;
   const night = /밤|저녁|새벽/.test(place);
   sg.save(); if (blur) sg.filter = 'blur(6px)';
@@ -695,7 +826,8 @@ $('#recBtn').onclick = () => run(async () => {
   await ensureFrames(); await ac().resume();
   const dest = ac().createMediaStreamDestination();
   const stream = new MediaStream([...stage.captureStream(FPS).getVideoTracks(), ...dest.stream.getAudioTracks()]);
-  const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+  const mime = ['video/mp4;codecs=avc1.42E01F,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+  const ext = mime.startsWith('video/mp4') ? 'mp4' : 'webm';
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
   const chunks = []; rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
   const stopped = new Promise((res) => { rec.onstop = res; });
@@ -706,12 +838,69 @@ $('#recBtn').onclick = () => run(async () => {
   if (rec.state !== 'inactive') { await new Promise((r) => setTimeout(r, 300)); rec.stop(); }
   await stopped;
   if (S.abort) throw new Cancelled();
-  const blob = new Blob(chunks, { type: 'video/webm' });
+  const blob = new Blob(chunks, { type: ext === 'mp4' ? 'video/mp4' : 'video/webm' });
   window.__lastVideo = blob;
-  const a = $('#dl'); a.href = URL.createObjectURL(blob); a.download = `썰툰-${new Date().toISOString().slice(0, 10)}.webm`; a.hidden = false;
-  a.textContent = `다운로드 (${(blob.size / 1048576).toFixed(1)}MB)`;
+  const a = $('#dl'); a.href = URL.createObjectURL(blob); a.download = `썰툰-${new Date().toISOString().slice(0, 10)}.${ext}`; a.hidden = false;
+  a.textContent = `다운로드 (${ext.toUpperCase()}, ${(blob.size / 1048576).toFixed(1)}MB)`;
   a.click();
   showMsg('영상을 저장했습니다. 다운로드가 자동으로 시작되지 않으면 "다운로드"를 눌러 주세요.', 'info');
+});
+
+/* ---------- 작업 저장·불러오기 ---------- */
+function bufferToWavB64(buf) {
+  const d = buf.getChannelData(0), n = d.length, r = buf.sampleRate, ab = new ArrayBuffer(44 + n * 2), v = new DataView(ab);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, r, true); v.setUint32(28, r * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, d[i])) * 32767, true);
+  const u8 = new Uint8Array(ab); let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function wavB64ToBuffer(b64) { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return ac().decodeAudioData(u8.buffer); }
+function imgToDataURL(img, type = 'image/png') { const c = newCanvas(img.naturalWidth || img.width, img.naturalHeight || img.height); c.getContext('2d').drawImage(img, 0, 0); return c.toDataURL(type, 0.9); }
+$('#saveProj').onclick = () => run(async () => {
+  if (!S.cuts.length) throw new Error('저장할 작업이 없습니다. 대본에서 "컷 나누기"를 먼저 해 주세요.');
+  setStatus('작업 저장 준비 중', 0, 1);
+  const chars = {};
+  for (const n of S.order) {
+    const ch = S.chars[n], o = { voice: ch.voice, source: ch.source, palette: ch.palette, label: ch.label };
+    if (ch.source === 'zip') { o.boxes = ch.boxes; o.assets = {}; for (const [ex, a] of Object.entries(ch.assets)) { o.assets[ex] = {}; for (const [k, im] of Object.entries(a)) o.assets[ex][k] = imgToDataURL(im); } }
+    chars[n] = o;
+  }
+  const data = {
+    app: 'sseoltoon-maker', v: 1, savedAt: new Date().toISOString(), script: $('#script').value, order: S.order, chars,
+    cuts: S.cuts.map((c) => ({ kind: c.kind, speaker: c.speaker, text: c.text, place: c.place, newScene: c.newScene, expr: c.expr, layout: c.layout, shake: c.shake, partner: c.partner, bufferVoice: c.bufferVoice, audio: c.buffer ? bufferToWavB64(c.buffer) : null })),
+    backgrounds: Object.fromEntries(Object.entries(S.bgImages).map(([k, im]) => [k, imgToDataURL(im, 'image/jpeg')])),
+    sound: { sfx: $('#sfxOn').checked, bgm: $('#bgmSel').value, vol: $('#bgmVol').value },
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = $('#projDl'); a.href = URL.createObjectURL(blob); a.download = `썰툰-작업-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')}.json`; a.click();
+  showMsg(`작업을 파일로 저장했습니다 (${(blob.size / 1048576).toFixed(1)}MB). 나중에 "불러오기"로 이어서 할 수 있습니다.`, 'info');
+});
+$('#loadProj').onchange = (e) => run(async () => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  setStatus('작업 불러오는 중', 0, 1);
+  let data; try { data = JSON.parse(await f.text()); } catch { throw new Error('작업 파일을 읽지 못했습니다.'); }
+  if (data.app !== 'sseoltoon-maker') throw new Error('썰툰 제작기에서 저장한 작업 파일이 아닙니다.');
+  stopPlay();
+  $('#script').value = data.script || '';
+  S.order = data.order; S.chars = {};
+  for (const n of S.order) {
+    const o = data.chars[n], ch = { name: n, voice: o.voice, source: o.source, palette: o.palette, label: o.label, frames: {} };
+    if (o.source === 'zip') { ch.boxes = o.boxes; ch.assets = {}; for (const [ex, a] of Object.entries(o.assets)) { ch.assets[ex] = {}; for (const [k, url] of Object.entries(a)) ch.assets[ex][k] = await loadImg(url); } }
+    S.chars[n] = ch;
+  }
+  S.cuts = [];
+  for (const c of data.cuts) { const { audio, ...rest } = c; const cut = { ...rest }; if (audio) cut.buffer = await wavB64ToBuffer(audio); S.cuts.push(cut); }
+  S.bgImages = {}; for (const [k, url] of Object.entries(data.backgrounds || {})) S.bgImages[k] = await loadImg(url);
+  if (data.sound) { $('#sfxOn').checked = data.sound.sfx; $('#bgmSel').value = data.sound.bgm; $('#bgmVol').value = data.sound.vol; }
+  S.audio = null; P.offset = 0;
+  $('#parseNote').textContent = `컷 ${S.cuts.length}개 · 등장인물 ${S.order.length}명 (불러옴)`;
+  renderChars(); renderPlaces();
+  const done = S.cuts.every((c) => c.buffer);
+  if (done) await buildTimeline();
+  showMsg(`작업을 불러왔습니다. 음성 ${S.cuts.filter((c) => c.buffer).length}/${S.cuts.length}컷 완료 상태입니다.`, 'info');
+  renderNav(); go(done ? 5 : 4);
 });
 
 /* ---------- AI 대본 정리 ---------- */
@@ -730,7 +919,7 @@ $('#aiFormatBtn').onclick = () => run(async () => {
 
 /* ---------- 단계 이동 ---------- */
 function stepState() {
-  return { 1: true, 2: S.cuts.length > 0, 3: S.cuts.length > 0, 4: S.cuts.length > 0, 5: !!S.audio };
+  return { 1: true, 2: S.cuts.length > 0, 3: S.cuts.length > 0, 4: S.cuts.length > 0, 5: S.cuts.length > 0 && S.cuts.every((c) => c.buffer) };
 }
 function renderNav() {
   const st = stepState();
@@ -747,7 +936,7 @@ function go(n) {
   $$('section').forEach((s) => s.classList.toggle('active', s.id === `s${n}`));
   if (n === 3) renderCuts();
   if (n === 4) renderVoice();
-  if (n === 5) { ensureFrames().then(() => drawAt(P.offset)); renderTimelineBar(); }
+  if (n === 5) { (async () => { if (!S.audio && S.cuts.every((c) => c.buffer)) await buildTimeline(); await ensureFrames(); drawAt(Math.min(P.offset, S.total - 0.01)); renderTimelineBar(); })(); }
   renderNav(); window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 $$('nav button').forEach((b) => { b.onclick = () => go(Number(b.dataset.step)); });
@@ -759,6 +948,7 @@ function setMode(m) {
 }
 $('#modeDemo').onclick = () => setMode('demo');
 $('#modeGemini').onclick = () => setMode('gemini');
+window.addEventListener('beforeunload', (e) => { if (S.cuts.some((c) => c.buffer)) { e.preventDefault(); e.returnValue = ''; } });
 try { const k = localStorage.getItem('sseoltoon-gemini-key'); if (k) $('#keyInput').value = k; } catch { /* 저장소 사용 불가 */ }
 $('#keyInput').onchange = () => { try { localStorage.setItem('sseoltoon-gemini-key', key()); } catch { /* 무시 */ } };
 go(1);
